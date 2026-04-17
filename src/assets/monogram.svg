@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" fill="none">
+  <defs>
+    <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4B16A"/>
+      <stop offset="50%" stop-color="#B8924A"/>
+      <stop offset="100%" stop-color="#8E6F35"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#brass)" stroke-width="2.2" fill="none" stroke-linecap="round">
+    <!-- Decorative outer flourish -->
+    <path d="M100 8 C 60 30, 30 70, 30 120 C 30 175, 60 215, 100 232 C 140 215, 170 175, 170 120 C 170 70, 140 30, 100 8 Z" opacity="0.35"/>
+    <!-- S letter (stylized) -->
+    <path d="M128 70 C 118 58, 95 56, 82 66 C 68 78, 72 96, 90 102 L 112 110 C 130 116, 134 134, 120 146 C 106 156, 82 154, 72 142" stroke-width="3"/>
+    <!-- O letter (oval, overlapping) -->
+    <ellipse cx="100" cy="140" rx="38" ry="46" stroke-width="3"/>
+    <!-- Top serif accent -->
+    <path d="M70 50 L 130 50" stroke-width="1.2"/>
+    <path d="M75 196 L 125 196" stroke-width="1.2"/>
+    <!-- Tiny dot ornaments -->
+    <circle cx="100" cy="44" r="2" fill="url(#brass)"/>
+    <circle cx="100" cy="202" r="2" fill="url(#brass)"/>
+  </g>
+</svg>
