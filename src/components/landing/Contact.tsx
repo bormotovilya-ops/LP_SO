@@ -48,7 +48,7 @@ export const Contact = () => {
     } catch {
       toast({
         title: "Не удалось отправить",
-        description: "Попробуйте позже или напишите в Telegram или на почту.",
+        description: "Попробуйте позже или напишите в Telegram.",
         variant: "destructive",
       });
     } finally {
@@ -83,20 +83,13 @@ export const Contact = () => {
 
           <div className="mt-12 space-y-4 border-t border-hairline pt-8 text-sm">
             <a
-              href="https://t.me/svetlana"
+              href="https://t.me/svetlana_ozhgi"
               target="_blank"
               rel="noreferrer"
               className="flex items-center justify-between border-b border-hairline/60 py-3 transition-colors hover:border-accent"
             >
               <span className="text-muted-foreground">Telegram</span>
-              <span className="font-display text-lg text-foreground">@svetlana</span>
-            </a>
-            <a
-              href="mailto:hello@svetlana.ru"
-              className="flex items-center justify-between border-b border-hairline/60 py-3 transition-colors hover:border-accent"
-            >
-              <span className="text-muted-foreground">Email</span>
-              <span className="font-display text-lg text-foreground">hello@svetlana.ru</span>
+              <span className="font-display text-lg text-foreground">@svetlana_ozhgi</span>
             </a>
           </div>
         </div>

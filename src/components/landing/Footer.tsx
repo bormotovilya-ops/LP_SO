@@ -4,11 +4,11 @@ import { FOOTER_NAV_EXTRA, SECTION_NAV } from "./navLinks";
 const FOOTER_NAV = [...SECTION_NAV, ...FOOTER_NAV_EXTRA];
 
 const SOCIALS = [
-  { label: "Instagram", href: "#" },
-  { label: "VK", href: "#" },
-  { label: "Telegram", href: "#" },
-  { label: "Дзен", href: "#" },
-  { label: "TenChat", href: "#" },
+  { label: "Instagram", href: "https://www.instagram.com/svetlana.ozhgi/" },
+  { label: "VK", href: "https://vk.com/id457546762" },
+  { label: "Telegram", href: "https://t.me/svetlana_ozhgi" },
+  { label: "YouTube", href: "https://www.youtube.com/@o_sveta_zhgi" },
+  { label: "WhatsApp", href: "https://wa.me/79388768974" },
 ];
 
 export const Footer = () => (
@@ -43,6 +43,8 @@ export const Footer = () => (
               <li key={s.label}>
                 <a
                   href={s.href}
+                  target="_blank"
+                  rel="noreferrer"
                   className="flex items-center justify-between border-b border-hairline/60 py-2 text-foreground/85 transition-colors hover:border-accent hover:text-accent"
                 >
                   <span>{s.label}</span>
