@@ -15,25 +15,40 @@ export const Contact = () => {
     const messenger = String(formData.get("messenger") ?? "").trim();
     const goal = String(formData.get("goal") ?? "").trim();
     const message = String(formData.get("message") ?? "").trim();
+    const website = String(formData.get("website") ?? "").trim();
 
-    const lines = [
-      "Здравствуйте, Светлана!",
-      `Меня зовут ${name || "—"}, у меня запрос: ${goal || "не указан"}.`,
-      message ? `${message}` : "Описание ситуации пока не добавила.",
-      "",
-      "Хочу записаться к вам на диагностику.",
-      `Можете связаться со мной тут или в ${messenger || "удобном мессенджере"}, телефон: ${contact || "—"}.`,
-    ];
-    const text = encodeURIComponent(lines.join("\n"));
-    const telegramUrl = `https://t.me/ilyaborm?text=${text}`;
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          contact,
+          messenger,
+          goal,
+          message,
+          website,
+        }),
+      });
 
-    window.open(telegramUrl, "_blank", "noopener,noreferrer");
-    setSubmitting(false);
-    form.reset();
-    toast({
-      title: "Сообщение подготовлено",
-      description: "Открылся Telegram с текстом заявки для отправки в @ilyaborm.",
-    });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      form.reset();
+      toast({
+        title: "Заявка отправлена",
+        description: "Мы свяжемся с вами по указанным контактам.",
+      });
+    } catch {
+      toast({
+        title: "Не удалось отправить",
+        description: "Попробуйте позже или напишите в Telegram или на почту.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -85,6 +100,14 @@ export const Contact = () => {
           onSubmit={onSubmit}
           className="border border-hairline bg-surface p-8 md:p-12 lg:col-span-7"
         >
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="pointer-events-none absolute -left-[9999px] h-0 w-0 opacity-0"
+          />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <Field name="name" label="Имя" required />
             <Field name="contact" label="Телефон или мессенджер" required />
