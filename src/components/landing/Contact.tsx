@@ -15,7 +15,6 @@ export const Contact = () => {
     const messenger = String(formData.get("messenger") ?? "").trim();
     const goal = String(formData.get("goal") ?? "").trim();
     const message = String(formData.get("message") ?? "").trim();
-    const _hp = String(formData.get("_hp") ?? "").trim();
 
     try {
       const res = await fetch("/api/contact", {
@@ -27,7 +26,6 @@ export const Contact = () => {
           messenger,
           goal,
           message,
-          _hp,
         }),
       });
 
@@ -107,14 +105,6 @@ export const Contact = () => {
           onSubmit={onSubmit}
           className="border border-hairline bg-surface p-8 md:p-12 lg:col-span-7"
         >
-          <input
-            type="text"
-            name="_hp"
-            tabIndex={-1}
-            autoComplete="off"
-            aria-hidden="true"
-            className="pointer-events-none absolute -left-[9999px] h-0 w-0 opacity-0"
-          />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <Field name="name" label="Имя" required />
             <Field name="contact" label="Телефон или мессенджер" required />

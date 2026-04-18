@@ -3,6 +3,46 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 const TG_API = "https://api.telegram.org";
 const MAX_FIELD = 4000;
 
+/** Vercel/Node иногда отдаёт JSON строкой или Buffer; редко — только stream. */
+async function readJsonBody(req: VercelRequest): Promise<Record<string, unknown>> {
+  const raw = req.body as unknown;
+  if (raw != null && typeof raw === "string") {
+    try {
+      const o = JSON.parse(raw) as unknown;
+      return o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+  if (Buffer.isBuffer(raw)) {
+    try {
+      const o = JSON.parse(raw.toString("utf8")) as unknown;
+      return o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  const chunks: Buffer[] = [];
+  try {
+    for await (const chunk of req) {
+      if (Buffer.isBuffer(chunk)) chunks.push(chunk);
+      else if (typeof chunk === "string") chunks.push(Buffer.from(chunk, "utf8"));
+    }
+  } catch {
+    return {};
+  }
+  if (chunks.length === 0) return {};
+  try {
+    const o = JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+    return o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -31,17 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "Server misconfigured" });
   }
 
-  const raw = req.body;
-  const body =
-    raw && typeof raw === "object" && !Array.isArray(raw)
-      ? (raw as Record<string, unknown>)
-      : {};
-
-  // Не называть honeypot «website» — браузеры часто автозаполняют и заявка «уходит» без Telegram.
-  const honeypot = String(body._hp ?? "").trim();
-  if (honeypot) {
-    return res.status(200).json({ ok: true });
-  }
+  const body = await readJsonBody(req);
 
   const name = String(body.name ?? "")
     .trim()
@@ -60,8 +90,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .slice(0, MAX_FIELD);
 
   if (!name || !contact) {
+    console.error("[contact] invalid payload", {
+      keys: Object.keys(body),
+      nameLen: name.length,
+      contactLen: contact.length,
+    });
     return res.status(400).json({ error: "Invalid payload" });
   }
+
+  console.log("[contact] sending to telegram", { nameLen: name.length, contactLen: contact.length });
 
   const lines = [
     "<b>Новая заявка с сайта</b>",
@@ -92,21 +129,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
     });
 
-    const raw = await tgRes.text();
+    const tgRaw = await tgRes.text();
     let tgJson: { ok?: boolean; description?: string };
     try {
-      tgJson = JSON.parse(raw) as { ok?: boolean; description?: string };
+      tgJson = JSON.parse(tgRaw) as { ok?: boolean; description?: string };
     } catch {
-      console.error("Telegram non-JSON response", tgRes.status, raw.slice(0, 500));
+      console.error("Telegram non-JSON response", tgRes.status, tgRaw.slice(0, 500));
       return res.status(502).json({ error: "Delivery failed" });
     }
 
     // Telegram почти всегда отдаёт HTTP 200 даже при ошибке (ok: false).
     if (!tgJson.ok) {
-      console.error("Telegram sendMessage rejected:", tgJson.description ?? raw.slice(0, 300));
+      console.error("Telegram sendMessage rejected:", tgJson.description ?? tgRaw.slice(0, 300));
       return res.status(502).json({ error: "Delivery failed" });
     }
   }
 
+  console.log("[contact] telegram ok");
   return res.status(200).json({ ok: true });
 }
