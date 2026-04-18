@@ -23,8 +23,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHANNEL_ID;
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_CHANNEL_ID?.trim();
 
   if (!token || !chatId) {
     console.error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID");
@@ -37,7 +37,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? (raw as Record<string, unknown>)
       : {};
 
-  const honeypot = String(body.website ?? "").trim();
+  // Не называть honeypot «website» — браузеры часто автозаполняют и заявка «уходит» без Telegram.
+  const honeypot = String(body._hp ?? "").trim();
   if (honeypot) {
     return res.status(200).json({ ok: true });
   }
@@ -91,9 +92,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
     });
 
-    if (!tgRes.ok) {
-      const errBody = await tgRes.text();
-      console.error("Telegram sendMessage failed", tgRes.status, errBody);
+    const raw = await tgRes.text();
+    let tgJson: { ok?: boolean; description?: string };
+    try {
+      tgJson = JSON.parse(raw) as { ok?: boolean; description?: string };
+    } catch {
+      console.error("Telegram non-JSON response", tgRes.status, raw.slice(0, 500));
+      return res.status(502).json({ error: "Delivery failed" });
+    }
+
+    // Telegram почти всегда отдаёт HTTP 200 даже при ошибке (ok: false).
+    if (!tgJson.ok) {
+      console.error("Telegram sendMessage rejected:", tgJson.description ?? raw.slice(0, 300));
       return res.status(502).json({ error: "Delivery failed" });
     }
   }

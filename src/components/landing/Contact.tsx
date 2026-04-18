@@ -15,7 +15,7 @@ export const Contact = () => {
     const messenger = String(formData.get("messenger") ?? "").trim();
     const goal = String(formData.get("goal") ?? "").trim();
     const message = String(formData.get("message") ?? "").trim();
-    const website = String(formData.get("website") ?? "").trim();
+    const _hp = String(formData.get("_hp") ?? "").trim();
 
     try {
       const res = await fetch("/api/contact", {
@@ -27,11 +27,18 @@ export const Contact = () => {
           messenger,
           goal,
           message,
-          website,
+          _hp,
         }),
       });
 
-      if (!res.ok) {
+      let data: { ok?: boolean } = {};
+      try {
+        data = (await res.json()) as { ok?: boolean };
+      } catch {
+        throw new Error("bad response");
+      }
+
+      if (!res.ok || data.ok !== true) {
         throw new Error(`HTTP ${res.status}`);
       }
 
@@ -102,7 +109,7 @@ export const Contact = () => {
         >
           <input
             type="text"
-            name="website"
+            name="_hp"
             tabIndex={-1}
             autoComplete="off"
             aria-hidden="true"
