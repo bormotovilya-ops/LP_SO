@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* =========================================================
-   Дизайн-система: 3 темы под бизнес-психолога Светлану Ожгихину.
+   Дизайн-система: темы под бизнес-психолога Светлану Ожгихину.
    Все цвета HSL. Переключение через [data-theme] на <html>.
    ========================================================= */
 
@@ -142,6 +142,324 @@
 
     --hero-overlay: linear-gradient(135deg, hsl(215 35% 6% / 0.92), hsl(215 30% 14% / 0.6));
     --shadow-elegant: 0 30px 80px -30px hsl(215 50% 2% / 0.7);
+  }
+
+  [data-theme="praline-mocha"] {
+    /* Praline Mocha — шоколад с «полосами»: тёмный фон + более светлые surface/card/muted */
+    --background: 22 26% 11%;
+    --foreground: 36 32% 93%;
+
+    --surface: 24 22% 18%;
+    --surface-foreground: 36 32% 93%;
+
+    --muted: 26 24% 26%;
+    --muted-foreground: 32 18% 72%;
+
+    --accent: 28 42% 54%;
+    --accent-foreground: 22 26% 10%;
+    --accent-soft: 28 38% 62%;
+
+    --hairline: 28 20% 34%;
+
+    --card: 30 28% 32%;
+    --card-foreground: 36 35% 96%;
+
+    --popover: 22 26% 11%;
+    --popover-foreground: 36 32% 93%;
+
+    --primary: 28 42% 54%;
+    --primary-foreground: 22 26% 10%;
+
+    --secondary: 26 22% 22%;
+    --secondary-foreground: 36 32% 93%;
+
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 36 35% 96%;
+
+    --border: 26 22% 28%;
+    --input: 26 22% 28%;
+    --ring: 28 42% 54%;
+
+    --radius: 0.25rem;
+
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+
+    --hero-overlay: linear-gradient(
+      135deg,
+      hsl(22 28% 9% / 0.92),
+      hsl(30 26% 22% / 0.55)
+    );
+    --shadow-elegant: 0 30px 80px -30px hsl(22 40% 4% / 0.55);
+  }
+
+  [data-theme="lagoon-teal"] {
+    /* Lagoon Teal — чёткие ступени (все ещё светлые, чтобы текст оставался тёмным на панелях) */
+    --background: 186 32% 88%;
+    --foreground: 196 44% 11%;
+
+    --surface: 192 36% 72%;
+    --surface-foreground: 196 44% 11%;
+
+    --muted: 184 22% 64%;
+    --muted-foreground: 196 28% 26%;
+
+    --accent: 173 55% 31%;
+    --accent-foreground: 165 40% 98%;
+    --accent-soft: 171 48% 42%;
+
+    --hairline: 192 30% 52%;
+
+    --card: 188 48% 99%;
+    --card-foreground: 196 44% 11%;
+
+    --popover: 188 48% 99%;
+    --popover-foreground: 196 44% 11%;
+
+    --primary: 173 55% 31%;
+    --primary-foreground: 165 40% 98%;
+
+    --secondary: 189 28% 80%;
+    --secondary-foreground: 196 44% 11%;
+
+    --destructive: 0 70% 42%;
+    --destructive-foreground: 36 35% 97%;
+
+    --border: 192 32% 54%;
+    --input: 192 32% 54%;
+    --ring: 173 55% 31%;
+
+    --radius: 0.25rem;
+
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+
+    --hero-overlay: linear-gradient(
+      135deg,
+      hsl(186 36% 90% / 0.35),
+      hsl(200 40% 62% / 0.5)
+    );
+    --shadow-elegant: 0 30px 80px -30px hsl(198 38% 24% / 0.26);
+  }
+
+  [data-theme="rose-dawn"] {
+    --background: 340 32% 94%;
+    --foreground: 328 28% 16%;
+
+    --surface: 338 28% 89%;
+    --surface-foreground: 328 28% 16%;
+
+    --muted: 335 22% 84%;
+    --muted-foreground: 330 14% 38%;
+
+    --accent: 346 48% 50%;
+    --accent-foreground: 340 30% 98%;
+    --accent-soft: 346 42% 58%;
+
+    --hairline: 335 16% 72%;
+
+    --card: 342 38% 97%;
+    --card-foreground: 328 28% 16%;
+
+    --popover: 342 38% 97%;
+    --popover-foreground: 328 28% 16%;
+
+    --primary: 346 48% 50%;
+    --primary-foreground: 340 30% 98%;
+
+    --secondary: 335 22% 84%;
+    --secondary-foreground: 328 28% 16%;
+
+    --destructive: 0 70% 46%;
+    --destructive-foreground: 340 30% 98%;
+
+    --border: 335 18% 78%;
+    --input: 335 18% 78%;
+    --ring: 346 48% 50%;
+
+    --radius: 0.25rem;
+
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+
+    --hero-overlay: linear-gradient(135deg, hsl(340 36% 96% / 0.4), hsl(350 32% 82% / 0.55));
+    --shadow-elegant: 0 30px 80px -30px hsl(328 28% 18% / 0.2);
+  }
+
+  [data-theme="slate-steel"] {
+    --background: 215 22% 92%;
+    --foreground: 222 32% 14%;
+
+    --surface: 218 20% 86%;
+    --surface-foreground: 222 32% 14%;
+
+    --muted: 216 16% 80%;
+    --muted-foreground: 220 14% 36%;
+
+    --accent: 210 52% 44%;
+    --accent-foreground: 215 40% 98%;
+    --accent-soft: 210 46% 54%;
+
+    --hairline: 218 14% 70%;
+
+    --card: 220 28% 97%;
+    --card-foreground: 222 32% 14%;
+
+    --popover: 220 28% 97%;
+    --popover-foreground: 222 32% 14%;
+
+    --primary: 210 52% 44%;
+    --primary-foreground: 215 40% 98%;
+
+    --secondary: 216 16% 80%;
+    --secondary-foreground: 222 32% 14%;
+
+    --destructive: 0 70% 44%;
+    --destructive-foreground: 220 28% 97%;
+
+    --border: 218 16% 74%;
+    --input: 218 16% 74%;
+    --ring: 210 52% 44%;
+
+    --radius: 0.25rem;
+
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+
+    --hero-overlay: linear-gradient(135deg, hsl(218 28% 94% / 0.42), hsl(215 24% 78% / 0.52));
+    --shadow-elegant: 0 30px 80px -30px hsl(222 35% 18% / 0.2);
+  }
+
+  [data-theme="olive-journal"] {
+    --background: 78 22% 91%;
+    --foreground: 82 28% 14%;
+
+    --surface: 76 20% 84%;
+    --surface-foreground: 82 28% 14%;
+
+    --muted: 74 16% 78%;
+    --muted-foreground: 78 12% 34%;
+
+    --accent: 94 38% 38%;
+    --accent-foreground: 78 30% 98%;
+    --accent-soft: 94 32% 48%;
+
+    --hairline: 76 14% 68%;
+
+    --card: 80 32% 96%;
+    --card-foreground: 82 28% 14%;
+
+    --popover: 80 32% 96%;
+    --popover-foreground: 82 28% 14%;
+
+    --primary: 94 38% 38%;
+    --primary-foreground: 78 30% 98%;
+
+    --secondary: 74 16% 78%;
+    --secondary-foreground: 82 28% 14%;
+
+    --destructive: 0 68% 44%;
+    --destructive-foreground: 80 32% 96%;
+
+    --border: 76 14% 72%;
+    --input: 76 14% 72%;
+    --ring: 94 38% 38%;
+
+    --radius: 0.25rem;
+
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+
+    --hero-overlay: linear-gradient(135deg, hsl(78 28% 93% / 0.4), hsl(88 22% 78% / 0.5));
+    --shadow-elegant: 0 30px 80px -30px hsl(82 30% 16% / 0.2);
+  }
+
+  [data-theme="violet-ink"] {
+    --background: 265 38% 96%;
+    --foreground: 268 42% 12%;
+
+    --surface: 266 32% 91%;
+    --surface-foreground: 268 42% 12%;
+
+    --muted: 264 24% 85%;
+    --muted-foreground: 268 16% 34%;
+
+    --accent: 270 52% 48%;
+    --accent-foreground: 265 45% 98%;
+    --accent-soft: 270 46% 58%;
+
+    --hairline: 266 18% 72%;
+
+    --card: 268 40% 98%;
+    --card-foreground: 268 42% 12%;
+
+    --popover: 268 40% 98%;
+    --popover-foreground: 268 42% 12%;
+
+    --primary: 270 52% 48%;
+    --primary-foreground: 265 45% 98%;
+
+    --secondary: 264 24% 85%;
+    --secondary-foreground: 268 42% 12%;
+
+    --destructive: 0 70% 44%;
+    --destructive-foreground: 268 40% 98%;
+
+    --border: 266 20% 78%;
+    --input: 266 20% 78%;
+    --ring: 270 52% 48%;
+
+    --radius: 0.25rem;
+
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+
+    --hero-overlay: linear-gradient(135deg, hsl(268 42% 97% / 0.4), hsl(275 36% 82% / 0.52));
+    --shadow-elegant: 0 30px 80px -30px hsl(268 40% 16% / 0.2);
+  }
+
+  [data-theme="amber-study"] {
+    --background: 38 42% 93%;
+    --foreground: 28 32% 14%;
+
+    --surface: 36 36% 87%;
+    --surface-foreground: 28 32% 14%;
+
+    --muted: 34 28% 80%;
+    --muted-foreground: 28 14% 36%;
+
+    --accent: 32 48% 48%;
+    --accent-foreground: 28 30% 98%;
+    --accent-soft: 32 42% 56%;
+
+    --hairline: 34 20% 70%;
+
+    --card: 40 45% 97%;
+    --card-foreground: 28 32% 14%;
+
+    --popover: 40 45% 97%;
+    --popover-foreground: 28 32% 14%;
+
+    --primary: 32 48% 48%;
+    --primary-foreground: 28 30% 98%;
+
+    --secondary: 34 28% 80%;
+    --secondary-foreground: 28 32% 14%;
+
+    --destructive: 0 70% 44%;
+    --destructive-foreground: 40 45% 97%;
+
+    --border: 34 22% 74%;
+    --input: 34 22% 74%;
+    --ring: 32 48% 48%;
+
+    --radius: 0.25rem;
+
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+
+    --hero-overlay: linear-gradient(135deg, hsl(38 48% 95% / 0.42), hsl(32 36% 80% / 0.52));
+    --shadow-elegant: 0 30px 80px -30px hsl(28 32% 18% / 0.2);
   }
 }
 
@@ -314,6 +632,113 @@
     flex: 0 0 auto;
   }
 
+  .word-pile {
+    position: relative;
+    border: 1px solid hsl(var(--hairline));
+    background:
+      radial-gradient(circle at 50% 18%, hsl(var(--accent) / 0.12), transparent 55%),
+      radial-gradient(circle at 70% 88%, hsl(var(--accent) / 0.08), transparent 50%),
+      hsl(var(--muted) / 0.28);
+    padding: 2.75rem 1rem 2.25rem;
+    overflow: visible;
+    isolation: isolate;
+  }
+
+  .word-pile::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      165deg,
+      transparent 8%,
+      hsl(var(--accent) / 0.06) 48%,
+      transparent 92%
+    );
+    pointer-events: none;
+  }
+
+  .word-pile__hint {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    z-index: 20;
+  }
+
+  .word-pile__heap {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 46rem;
+    min-height: 560px;
+    margin: 0 auto;
+  }
+
+  .word-pile__word {
+    appearance: none;
+    position: absolute;
+    left: var(--left);
+    top: var(--top);
+    z-index: var(--z);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid hsl(var(--hairline));
+    background: hsl(var(--surface) / 0.94);
+    color: hsl(var(--foreground));
+    font-size: clamp(0.78rem, 1.55vw, 1.05rem);
+    line-height: 1.05;
+    white-space: nowrap;
+    box-shadow: 0 12px 26px -18px hsl(0 0% 0% / 0.72);
+    transform: translate(-50%, -50%) rotate(var(--wr)) scale(var(--sc));
+    transform-origin: center;
+    transition:
+      transform 0.82s cubic-bezier(0.15, 0.85, 0.2, 1),
+      opacity 0.72s ease,
+      filter 0.72s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .word-pile__word:hover:not(:disabled) {
+    border-color: hsl(var(--accent) / 0.55);
+    box-shadow: 0 12px 30px -18px hsl(var(--accent) / 0.35);
+  }
+
+  .word-pile__word:disabled {
+    cursor: default;
+    opacity: 0.75;
+  }
+
+  .word-pile__word--yank {
+    animation: word-pile-yank 0.62s cubic-bezier(0.18, 0.85, 0.22, 1) forwards;
+    z-index: 40;
+    pointer-events: none;
+  }
+
+  .word-pile--exploded .word-pile__word {
+    opacity: 0;
+    filter: blur(9px);
+    pointer-events: none;
+    transform: translate(-50%, -50%) rotate(calc(var(--wr) + var(--vr))) translate(var(--vx), var(--vy))
+      scale(calc(var(--sc) * 0.38));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .word-pile__word--yank {
+      animation: none;
+      opacity: 0;
+    }
+
+    .word-pile--exploded .word-pile__word {
+      transition-duration: 0.01ms;
+    }
+  }
+
   @keyframes reviews-scroll {
     from {
       transform: translateX(0);
@@ -352,6 +777,23 @@
     84% {
       transform: translateX(145%);
       opacity: 0;
+    }
+  }
+
+  @keyframes word-pile-yank {
+    0% {
+      transform: translate(-50%, -50%) rotate(var(--wr)) scale(var(--sc));
+      opacity: 1;
+      filter: none;
+    }
+    55% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-50%, -50%) rotate(calc(var(--wr) + 11deg)) translate(0, -7.75rem) translate(0.45rem, 0)
+        scale(calc(var(--sc) * 0.86));
+      opacity: 0;
+      filter: blur(3px);
     }
   }
 }

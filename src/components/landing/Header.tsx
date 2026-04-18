@@ -1,13 +1,5 @@
 import { Monogram } from "./Monogram";
-
-const NAV = [
-  { href: "#about", label: "Кому помогаю" },
-  { href: "#method", label: "Метод" },
-  { href: "#products", label: "Услуги" },
-  { href: "#process", label: "Как работаем" },
-  { href: "#reviews", label: "Отзывы" },
-  { href: "#certificates", label: "Образование" },
-];
+import { SECTION_NAV } from "./navLinks";
 
 export const Header = () => (
   <header className="absolute left-0 right-0 top-0 z-40">
@@ -15,7 +7,7 @@ export const Header = () => (
       <Monogram />
       <nav className="hidden flex-1 px-8 lg:block">
         <div className="grid grid-cols-6 items-center gap-4 xl:gap-5">
-        {NAV.map((item) => (
+        {SECTION_NAV.map((item) => (
           <a
             key={item.href}
             href={item.href}

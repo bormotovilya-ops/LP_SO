@@ -1,4 +1,7 @@
 import { Monogram } from "./Monogram";
+import { FOOTER_NAV_EXTRA, SECTION_NAV } from "./navLinks";
+
+const FOOTER_NAV = [...SECTION_NAV, ...FOOTER_NAV_EXTRA];
 
 const SOCIALS = [
   { label: "Instagram", href: "#" },
@@ -23,11 +26,13 @@ export const Footer = () => (
         <div className="lg:col-span-3">
           <div className="eyebrow mb-5">Навигация</div>
           <ul className="space-y-3 text-sm">
-            <li><a href="#about" className="link-underline text-foreground/85">Обо мне</a></li>
-            <li><a href="#products" className="link-underline text-foreground/85">Услуги</a></li>
-            <li><a href="#method" className="link-underline text-foreground/85">Метод</a></li>
-            <li><a href="#test" className="link-underline text-foreground/85">Тест</a></li>
-            <li><a href="#contact" className="link-underline text-foreground/85">Диагностика</a></li>
+            {FOOTER_NAV.map((item) => (
+              <li key={item.href}>
+                <a href={item.href} className="link-underline text-foreground/85">
+                  {item.label}
+                </a>
+              </li>
+            ))}
           </ul>
         </div>
 
