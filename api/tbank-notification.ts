@@ -1,7 +1,76 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createHash } from "crypto";
 
+const TG_API = "https://api.telegram.org";
+
 type JsonRecord = Record<string, unknown>;
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function isTruthySuccess(v: unknown): boolean {
+  return v === true || v === "true";
+}
+
+/**
+ * Одно уведомление в канал при успешном списании (без AUTHORIZED — иначе дубль при одностадийной оплате).
+ */
+async function notifyTelegramChannelPayment(body: JsonRecord): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_CHANNEL_ID?.trim();
+  if (!token || !chatId) {
+    console.warn("[tbank-notification] telegram skipped: set TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID");
+    return;
+  }
+
+  const status = String(body.Status ?? "");
+  if (status !== "CONFIRMED") return;
+  if (!isTruthySuccess(body.Success)) return;
+
+  const orderId = String(body.OrderId ?? "");
+  const paymentId = String(body.PaymentId ?? "");
+  const amountRaw = body.Amount;
+  const amountKop = typeof amountRaw === "number" ? amountRaw : Number(amountRaw);
+  const amountRub =
+    Number.isFinite(amountKop) && amountKop > 0 ? (amountKop / 100).toFixed(2).replace(/\.00$/, "") : "—";
+  const desc = String(body.Description ?? "").trim().slice(0, 300);
+
+  const lines = [
+    "<b>Оплата на сайте (Т‑Банк)</b>",
+    "",
+    `<b>Статус:</b> ${escapeHtml(status)}`,
+    `<b>Заказ:</b> <code>${escapeHtml(orderId)}</code>`,
+    `<b>Платёж:</b> <code>${escapeHtml(paymentId)}</code>`,
+    `<b>Сумма:</b> ${escapeHtml(amountRub)} ₽`,
+  ];
+  if (desc) lines.push("", `<b>Описание:</b> ${escapeHtml(desc)}`);
+
+  const html = lines.join("\n");
+
+  const tgRes = await fetch(`${TG_API}/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: html,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    }),
+  });
+
+  const tgRaw = await tgRes.text();
+  let tgJson: { ok?: boolean; description?: string };
+  try {
+    tgJson = JSON.parse(tgRaw) as { ok?: boolean; description?: string };
+  } catch {
+    console.error("[tbank-notification] telegram non-JSON", tgRes.status, tgRaw.slice(0, 400));
+    return;
+  }
+  if (!tgJson.ok) {
+    console.error("[tbank-notification] telegram sendMessage failed:", tgJson.description ?? tgRaw.slice(0, 300));
+  }
+}
 
 /**
  * Чтение тела POST (JSON или уже распарсенный объект Vercel).
@@ -106,6 +175,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     Success: body.Success,
     Amount: body.Amount,
   });
+
+  try {
+    await notifyTelegramChannelPayment(body);
+  } catch (e) {
+    console.error("[tbank-notification] telegram notify error", e);
+  }
 
   return sendOk(res);
 }
