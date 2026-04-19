@@ -1,4 +1,20 @@
-const PRODUCTS = [
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+
+type Product = {
+  tag: string;
+  title: string;
+  desc: string;
+  price: string;
+  priceNote: string;
+  cta: string;
+  href: string;
+  featured?: boolean;
+  /** Кнопка оплаты через Т‑Банк (сумма задаётся на сервере) */
+  tbankPay?: boolean;
+};
+
+const PRODUCTS: Product[] = [
   {
     tag: "Флагман",
     title: "Групповое наставничество",
@@ -35,10 +51,42 @@ const PRODUCTS = [
     priceNote: "Цифровые продукты",
     cta: "Подробнее",
     href: "#contact",
+    tbankPay: true,
   },
 ];
 
-export const Products = () => (
+export const Products = () => {
+  const { toast } = useToast();
+  const [paying, setPaying] = useState(false);
+
+  const startTbankPay = async () => {
+    setPaying(true);
+    try {
+      const res = await fetch("/api/payment-init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteOrigin: window.location.origin }),
+      });
+      const data = (await res.json()) as { paymentUrl?: string; error?: string };
+      if (!res.ok || !data.paymentUrl) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const w = window.open(data.paymentUrl, "_blank", "noopener,noreferrer");
+      if (!w) {
+        window.location.assign(data.paymentUrl);
+      }
+    } catch {
+      toast({
+        title: "Оплата недоступна",
+        description: "Попробуйте позже или напишите в Telegram.",
+        variant: "destructive",
+      });
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  return (
   <section id="products" className="relative bg-background py-28 md:py-40">
     <div className="container-luxe">
       <div className="mb-16 flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
@@ -84,16 +132,29 @@ export const Products = () => (
               </div>
             </div>
 
-            <a
-              href={p.href}
-              className="mt-8 inline-flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-foreground transition-colors hover:text-accent"
-            >
-              <span>{p.cta}</span>
-              <span className="h-px w-10 bg-accent transition-all duration-500 group-hover:w-20" />
-            </a>
+            <div className="mt-8 flex flex-col items-start gap-4">
+              <a
+                href={p.href}
+                className="inline-flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-foreground transition-colors hover:text-accent"
+              >
+                <span>{p.cta}</span>
+                <span className="h-px w-10 bg-accent transition-all duration-500 group-hover:w-20" />
+              </a>
+              {p.tbankPay && (
+                <button
+                  type="button"
+                  disabled={paying}
+                  onClick={() => void startTbankPay()}
+                  className="inline-flex items-center gap-3 border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                >
+                  {paying ? "Открываем оплату…" : "Оплатить — 10 ₽"}
+                </button>
+              )}
+            </div>
           </article>
         ))}
       </div>
     </div>
   </section>
-);
+  );
+};
