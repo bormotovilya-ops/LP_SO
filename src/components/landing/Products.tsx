@@ -103,11 +103,13 @@ export const Products = () => {
       setPracticesPaidState(true);
       const pendingOrderId = sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
       sessionStorage.removeItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
-      void fetch("/api/practices-paid-notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: pendingOrderId || undefined }),
-      }).catch(() => {});
+      if (pendingOrderId) {
+        void fetch("/api/practices-paid-notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: pendingOrderId }),
+        }).catch(() => {});
+      }
       stripPayQueryFromUrl();
       toast({
         title: "Оплата прошла",
