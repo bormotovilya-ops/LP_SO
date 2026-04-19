@@ -7,7 +7,13 @@ const INIT_TEST = "https://rest-api-test.tinkoff.ru/v2/Init";
 /** 10 ₽ — сумма в копейках для эквайринга Т‑Банка */
 const AMOUNT_KOPECKS = 1000;
 
+const RECEIPT_ITEM_NAME = "Сборники практик (цифровой продукт)";
+
 type JsonRecord = Record<string, unknown>;
+
+function isNonEmptyEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
 
 async function readJsonBody(req: VercelRequest): Promise<JsonRecord> {
   const raw = req.body as unknown;
@@ -100,11 +106,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const orderId = randomUUID();
 
+  const receiptEmailRaw =
+    typeof body.receiptEmail === "string"
+      ? body.receiptEmail.trim()
+      : typeof body.email === "string"
+        ? body.email.trim()
+        : "";
+  const receiptEmail =
+    receiptEmailRaw && isNonEmptyEmail(receiptEmailRaw)
+      ? receiptEmailRaw
+      : (process.env.TBANK_RECEIPT_EMAIL?.trim() ?? "");
+
+  if (!receiptEmail || !isNonEmptyEmail(receiptEmail)) {
+    console.error("[payment-init] missing receipt email (body.receiptEmail or TBANK_RECEIPT_EMAIL)");
+    return res.status(400).json({
+      error:
+        "Для чека нужен email: задайте TBANK_RECEIPT_EMAIL в Vercel или передайте receiptEmail в запросе.",
+      code: "MISSING_RECEIPT_EMAIL",
+    });
+  }
+
+  const taxation =
+    process.env.TBANK_RECEIPT_TAXATION?.trim() ||
+    process.env.TINKOFF_RECEIPT_TAXATION?.trim() ||
+    "usn_income";
+  const itemTax =
+    process.env.TBANK_RECEIPT_ITEM_TAX?.trim() ||
+    process.env.TINKOFF_RECEIPT_ITEM_TAX?.trim() ||
+    "none";
+
+  const receipt: JsonRecord = {
+    Email: receiptEmail,
+    Taxation: taxation,
+    Items: [
+      {
+        Name: RECEIPT_ITEM_NAME,
+        Price: AMOUNT_KOPECKS,
+        Quantity: 1,
+        Amount: AMOUNT_KOPECKS,
+        Tax: itemTax,
+        PaymentMethod: "full_payment",
+        PaymentObject: "service",
+      },
+    ],
+  };
+
   const payload: JsonRecord = {
     TerminalKey: terminalKey,
     Amount: AMOUNT_KOPECKS,
     OrderId: orderId,
     Description: "Сборники практик",
+    Receipt: receipt,
   };
 
   if (siteOrigin) {
@@ -133,6 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     PaymentURL?: string;
     ErrorCode?: string;
     Message?: string;
+    Details?: string;
   };
   try {
     json = JSON.parse(rawText) as typeof json;
@@ -142,10 +195,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!json.Success || !json.PaymentURL) {
-    console.error("[payment-init] init rejected", json.ErrorCode, json.Message, json);
+    console.error("[payment-init] init rejected", json.ErrorCode, json.Message, json.Details, json);
     return res.status(400).json({
       error: json.Message || "Payment init failed",
       code: json.ErrorCode,
+      details: json.Details,
     });
   }
 
