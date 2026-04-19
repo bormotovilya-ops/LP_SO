@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { getPracticesPaid, PRACTICES_STORAGE_KEY, setPracticesPaid } from "@/lib/practicesPurchase";
 
 type Product = {
   tag: string;
@@ -55,9 +56,76 @@ const PRODUCTS: Product[] = [
   },
 ];
 
+function stripPayQueryFromUrl(): void {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("pay")) return;
+  params.delete("pay");
+  const q = params.toString();
+  const path = window.location.pathname;
+  const hash = window.location.hash;
+  window.history.replaceState({}, "", `${path}${q ? `?${q}` : ""}${hash}`);
+}
+
 export const Products = () => {
   const { toast } = useToast();
   const [paying, setPaying] = useState(false);
+  const [practicesPaid, setPracticesPaidState] = useState(false);
+
+  const materialsHref = useMemo(() => {
+    const fromEnv = import.meta.env.VITE_PRACTICES_MATERIALS_URL?.trim();
+    if (fromEnv) return fromEnv;
+    const base = import.meta.env.BASE_URL.endsWith("/")
+      ? import.meta.env.BASE_URL
+      : `${import.meta.env.BASE_URL}/`;
+    return `${base}materials/sborniki-praktik.zip`;
+  }, []);
+
+  const materialsDownloadAttr = useMemo(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const u = new URL(materialsHref, window.location.origin);
+      return u.origin === window.location.origin;
+    } catch {
+      return false;
+    }
+  }, [materialsHref]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pay = params.get("pay");
+    if (pay === "ok") {
+      setPracticesPaid();
+      setPracticesPaidState(true);
+      stripPayQueryFromUrl();
+      toast({
+        title: "Оплата прошла",
+        description: "Материалы «Сборников практик» можно скачать ниже — доступ сохранится в этом браузере.",
+      });
+      const el = document.getElementById("products");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (pay === "fail") {
+      stripPayQueryFromUrl();
+      toast({
+        title: "Оплата не завершена",
+        description: "Если списание прошло с задержкой, обновите страницу или напишите в Telegram.",
+        variant: "destructive",
+      });
+    }
+    setPracticesPaidState(Boolean(getPracticesPaid()));
+    // Реагируем только на текущий URL при первом монтировании (в т.ч. ?pay=ok после банка).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== null && e.key !== PRACTICES_STORAGE_KEY) return;
+      setPracticesPaidState(Boolean(getPracticesPaid()));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const startTbankPay = async () => {
     setPaying(true);
@@ -130,6 +198,11 @@ export const Products = () => {
               <div className="mt-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                 {p.priceNote}
               </div>
+              {p.tbankPay && practicesPaid && (
+                <p className="mt-4 text-xs font-medium leading-relaxed text-accent">
+                  Оплачено — материалы можно скачать ниже.
+                </p>
+              )}
             </div>
 
             <div className="mt-8 flex flex-col items-start gap-4">
@@ -141,14 +214,30 @@ export const Products = () => {
                 <span className="h-px w-10 bg-accent transition-all duration-500 group-hover:w-20" />
               </a>
               {p.tbankPay && (
-                <button
-                  type="button"
-                  disabled={paying}
-                  onClick={() => void startTbankPay()}
-                  className="inline-flex items-center gap-3 border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                >
-                  {paying ? "Открываем оплату…" : "Оплатить — 10 ₽"}
-                </button>
+                <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch">
+                  <button
+                    type="button"
+                    disabled={paying}
+                    onClick={() => void startTbankPay()}
+                    className="inline-flex items-center justify-center gap-3 border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50 sm:min-h-[48px]"
+                  >
+                    {paying ? "Открываем оплату…" : "Оплатить — 10 ₽"}
+                  </button>
+                  {practicesPaid && (
+                    <>
+                      <a
+                        href={materialsHref}
+                        {...(materialsDownloadAttr ? { download: true } : {})}
+                        className="inline-flex items-center justify-center gap-2 border border-foreground/25 bg-surface px-5 py-3 text-xs uppercase tracking-[0.22em] text-foreground transition-colors hover:border-accent hover:text-accent sm:min-h-[48px]"
+                      >
+                        Скачать материалы
+                      </a>
+                      <p className="w-full text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                        Доступ к скачиванию сохранён в этом браузере после успешной оплаты.
+                      </p>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </article>
