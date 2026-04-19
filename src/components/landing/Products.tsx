@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { getPracticesPaid, PRACTICES_STORAGE_KEY, setPracticesPaid } from "@/lib/practicesPurchase";
+import {
+  getPracticesPaid,
+  PRACTICES_PENDING_ORDER_SESSION_KEY,
+  PRACTICES_STORAGE_KEY,
+  setPracticesPaid,
+} from "@/lib/practicesPurchase";
 
 type Product = {
   tag: string;
@@ -96,6 +101,13 @@ export const Products = () => {
     if (pay === "ok") {
       setPracticesPaid();
       setPracticesPaidState(true);
+      const pendingOrderId = sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
+      sessionStorage.removeItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
+      void fetch("/api/practices-paid-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: pendingOrderId || undefined }),
+      }).catch(() => {});
       stripPayQueryFromUrl();
       toast({
         title: "Оплата прошла",
@@ -135,9 +147,12 @@ export const Products = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ siteOrigin: window.location.origin }),
       });
-      const data = (await res.json()) as { paymentUrl?: string; error?: string };
+      const data = (await res.json()) as { paymentUrl?: string; orderId?: string; error?: string };
       if (!res.ok || !data.paymentUrl) {
         throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      if (data.orderId) {
+        sessionStorage.setItem(PRACTICES_PENDING_ORDER_SESSION_KEY, data.orderId);
       }
       const w = window.open(data.paymentUrl, "_blank", "noopener,noreferrer");
       if (!w) {
