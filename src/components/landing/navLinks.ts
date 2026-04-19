@@ -11,4 +11,6 @@ export const SECTION_NAV = [
 export const FOOTER_NAV_EXTRA = [
   { href: "#test", label: "Тест" },
   { href: "#contact", label: "Диагностика" },
+  { href: "/oferta", label: "Оферта" },
+  { href: "/privacy", label: "Конфиденциальность" },
 ] as const;

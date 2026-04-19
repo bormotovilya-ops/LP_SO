@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { seoBuildPlugin } from "./vite-plugin-seo";
 
 // GitHub Pages: repo URL is /LP_SO/ — use subpath in production CI builds only.
 // Vercel sets VERCEL=1 during build — site is served at domain root, base must be "/".
@@ -15,7 +16,7 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [react(), mode === "development" && componentTagger(), seoBuildPlugin()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

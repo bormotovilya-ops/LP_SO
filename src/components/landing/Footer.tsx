@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Monogram } from "./Monogram";
 import { FOOTER_NAV_EXTRA, SECTION_NAV } from "./navLinks";
 
@@ -28,9 +29,15 @@ export const Footer = () => (
           <ul className="space-y-3 text-sm">
             {FOOTER_NAV.map((item) => (
               <li key={item.href}>
-                <a href={item.href} className="link-underline text-foreground/85">
-                  {item.label}
-                </a>
+                {item.href.startsWith("/") ? (
+                  <Link to={item.href} className="link-underline text-foreground/85">
+                    {item.label}
+                  </Link>
+                ) : (
+                  <a href={item.href} className="link-underline text-foreground/85">
+                    {item.label}
+                  </a>
+                )}
               </li>
             ))}
           </ul>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
 export const Contact = () => {
@@ -122,7 +123,15 @@ export const Contact = () => {
           </button>
 
           <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
-            Нажимая кнопку, вы соглашаетесь с обработкой персональных данных.
+            Нажимая кнопку, вы соглашаетесь с{" "}
+            <Link to="/oferta" className="text-accent underline-offset-2 hover:underline">
+              публичной офертой
+            </Link>
+            ,{" "}
+            <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">
+              политикой конфиденциальности
+            </Link>{" "}
+            и обработкой персональных данных.
           </p>
         </form>
       </div>

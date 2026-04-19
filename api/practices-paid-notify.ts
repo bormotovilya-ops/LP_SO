@@ -58,7 +58,7 @@ function claimOrderNotify(orderId: string): boolean {
 }
 
 /**
- * То же подтверждение, что и на сайте при `?pay=ok`: редирект после оплаты в Т‑Банке.
+ * Уведомление в канал после успешного возврата с оплаты (когда на сайте открывается доступ).
  * Те же TELEGRAM_BOT_TOKEN / TELEGRAM_CHANNEL_ID, что и у заявок.
  * Без `orderId` в теле — в Telegram не шлём (избегаем второго «пустого» сообщения).
  */
@@ -94,7 +94,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const lines = [
     "<b>Оплата «Сборники практик»</b>",
     "",
-    "Покупатель вернулся на сайт после оплаты в Т‑Банке (как при показе доступа к материалам).",
     `<b>OrderId:</b> <code>${escapeHtml(orderId)}</code>`,
     "<b>Сумма на витрине:</b> 10 ₽",
     `<b>Время (UTC):</b> <code>${escapeHtml(new Date().toISOString())}</code>`,
