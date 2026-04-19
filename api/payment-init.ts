@@ -162,6 +162,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (siteOrigin) {
     payload.SuccessURL = `${siteOrigin}/?pay=ok`;
     payload.FailURL = `${siteOrigin}/?pay=fail`;
+    /** URL для HTTP(S)-уведомлений; совпадает с тем, что можно указать в кабинете терминала */
+    payload.NotificationURL = `${siteOrigin}/api/tbank-notification`;
   }
 
   const token = makeToken(payload, password);
