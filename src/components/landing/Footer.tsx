@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Monogram } from "./Monogram";
-import { FOOTER_NAV_EXTRA, SECTION_NAV } from "./navLinks";
+import { FOOTER_LEGAL_LINKS, FOOTER_NAV_EXTRA, SECTION_NAV } from "./navLinks";
 
 const FOOTER_NAV = [...SECTION_NAV, ...FOOTER_NAV_EXTRA];
 
@@ -16,7 +16,7 @@ export const Footer = () => (
   <footer className="bg-surface pb-10 pt-20">
     <div className="container-luxe">
       <div className="grid grid-cols-1 gap-12 border-b border-hairline pb-16 lg:grid-cols-12">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-4">
           <Monogram />
           <p className="mt-6 max-w-sm text-sm leading-relaxed text-muted-foreground">
             Бизнес-психолог и наставник для женщин. Работаю с состояниями, опорой на себя
@@ -43,7 +43,20 @@ export const Footer = () => (
           </ul>
         </div>
 
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-2">
+          <div className="eyebrow mb-5">Документы</div>
+          <ul className="space-y-3 text-sm">
+            {FOOTER_LEGAL_LINKS.map((item) => (
+              <li key={item.href}>
+                <Link to={item.href} className="link-underline text-foreground/85">
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="lg:col-span-3">
           <div className="eyebrow mb-5">Соцсети</div>
           <ul className="space-y-3 text-sm">
             {SOCIALS.map((s) => (

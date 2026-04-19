@@ -276,7 +276,7 @@ export const PrivacyBody = () => (
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">Редакция от 26.02.2025 г.</p>
+      <p className="text-xs text-muted-foreground">Редакция от 20.04.2026 г.</p>
     </section>
   </div>
 );

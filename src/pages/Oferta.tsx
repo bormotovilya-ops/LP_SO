@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
 import { Footer } from "@/components/landing/Footer";
 import { Monogram } from "@/components/landing/Monogram";
@@ -6,6 +6,10 @@ import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { OfertaBody } from "./OfertaBody";
 
 const Oferta = () => {
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     const prev = document.title;
     document.title = "Договор-оферта — Светлана Ожгихина";
@@ -44,7 +48,7 @@ const Oferta = () => {
             </span>
           </h1>
           <p className="mt-6 text-sm text-muted-foreground md:text-base">
-            г. Сочи · редакция от 28.02.2025 г.
+            г. Сочи · редакция от 20.04.2026 г.
           </p>
           <p className="mt-8 text-sm leading-relaxed text-foreground md:text-base">
             Настоящий документ является публичной офертой{" "}

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
 import { Footer } from "@/components/landing/Footer";
 import { Monogram } from "@/components/landing/Monogram";
@@ -6,6 +6,10 @@ import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { PrivacyBody } from "./PrivacyBody";
 
 const Privacy = () => {
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     const prev = document.title;
     document.title = "Политика конфиденциальности — Светлана Ожгихина";
@@ -40,7 +44,7 @@ const Privacy = () => {
           <h1 className="font-display text-3xl leading-[1.15] text-foreground md:text-5xl">
             Политика в отношении обработки персональных данных
           </h1>
-          <p className="mt-6 text-sm text-muted-foreground md:text-base">Редакция от 26.02.2025 г.</p>
+          <p className="mt-6 text-sm text-muted-foreground md:text-base">Редакция от 20.04.2026 г.</p>
           <p className="mt-8 text-sm leading-relaxed text-foreground md:text-base">
             Настоящая Политика устанавливает порядок обработки персональных данных пользователей сайта{" "}
             <strong>ИП Ожгихиной Светланы Евгеньевны</strong> (ИНН <strong>026407667105</strong>, ОГРНИП{" "}

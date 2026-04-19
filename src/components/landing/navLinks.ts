@@ -11,6 +11,10 @@ export const SECTION_NAV = [
 export const FOOTER_NAV_EXTRA = [
   { href: "#test", label: "Тест" },
   { href: "#contact", label: "Диагностика" },
-  { href: "/oferta", label: "Оферта" },
-  { href: "/privacy", label: "Конфиденциальность" },
+] as const;
+
+/** Отдельный блок подвала — не смешивать с якорной навигацией по лендингу */
+export const FOOTER_LEGAL_LINKS = [
+  { href: "/oferta", label: "Договор-оферта" },
+  { href: "/privacy", label: "Политика конфиденциальности" },
 ] as const;
