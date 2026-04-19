@@ -12,29 +12,31 @@ const SOCIALS = [
   { label: "WhatsApp", href: "https://wa.me/79388768974" },
 ];
 
+const footerLinkClass = "link-underline text-foreground/85 transition-colors hover:text-accent";
+
 export const Footer = () => (
   <footer className="bg-surface pb-10 pt-20">
     <div className="container-luxe">
-      <div className="grid grid-cols-1 gap-12 border-b border-hairline pb-16 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-12 border-b border-hairline pb-16 lg:grid-cols-12 lg:gap-x-10 lg:gap-y-0">
         <div className="lg:col-span-4">
           <Monogram />
-          <p className="mt-6 max-w-sm text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-6 max-w-md text-sm leading-relaxed text-muted-foreground">
             Бизнес-психолог и наставник для женщин. Работаю с состояниями, опорой на себя
             и устойчивым ростом — без обещаний «волшебной таблетки».
           </p>
         </div>
 
-        <div className="lg:col-span-3">
-          <div className="eyebrow mb-5">Навигация</div>
+        <div className="lg:col-span-2">
+          <div className="eyebrow mb-5 min-h-[1.25em]">Навигация</div>
           <ul className="space-y-3 text-sm">
             {FOOTER_NAV.map((item) => (
               <li key={item.href}>
                 {item.href.startsWith("/") ? (
-                  <Link to={item.href} className="link-underline text-foreground/85">
+                  <Link to={item.href} className={footerLinkClass}>
                     {item.label}
                   </Link>
                 ) : (
-                  <a href={item.href} className="link-underline text-foreground/85">
+                  <a href={item.href} className={footerLinkClass}>
                     {item.label}
                   </a>
                 )}
@@ -43,12 +45,12 @@ export const Footer = () => (
           </ul>
         </div>
 
-        <div className="lg:col-span-2">
-          <div className="eyebrow mb-5">Документы</div>
+        <div className="lg:col-span-3">
+          <div className="eyebrow mb-5 min-h-[1.25em]">Документы</div>
           <ul className="space-y-3 text-sm">
             {FOOTER_LEGAL_LINKS.map((item) => (
               <li key={item.href}>
-                <Link to={item.href} className="link-underline text-foreground/85">
+                <Link to={item.href} className={footerLinkClass}>
                   {item.label}
                 </Link>
               </li>
@@ -57,20 +59,12 @@ export const Footer = () => (
         </div>
 
         <div className="lg:col-span-3">
-          <div className="eyebrow mb-5">Соцсети</div>
+          <div className="eyebrow mb-5 min-h-[1.25em]">Соцсети</div>
           <ul className="space-y-3 text-sm">
             {SOCIALS.map((s) => (
               <li key={s.label}>
-                <a
-                  href={s.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-between border-b border-hairline/60 py-2 text-foreground/85 transition-colors hover:border-accent hover:text-accent"
-                >
-                  <span>{s.label}</span>
-                  <span className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-                    Перейти →
-                  </span>
+                <a href={s.href} target="_blank" rel="noreferrer" className={footerLinkClass}>
+                  {s.label}
                 </a>
               </li>
             ))}
@@ -78,9 +72,9 @@ export const Footer = () => (
         </div>
       </div>
 
-      <div className="mt-8 flex flex-col items-start justify-between gap-4 text-[11px] uppercase tracking-[0.22em] text-muted-foreground md:flex-row md:items-center">
+      <div className="mt-10 flex flex-col items-start justify-between gap-4 border-t border-hairline/80 pt-8 text-[11px] uppercase tracking-[0.22em] text-muted-foreground sm:flex-row sm:items-center">
         <span>© {new Date().getFullYear()} Светлана Ожгихина</span>
-        <span>Психология глубокой трансформации</span>
+        <span className="sm:text-right">Психология глубокой трансформации</span>
       </div>
     </div>
   </footer>
