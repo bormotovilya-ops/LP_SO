@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,12 +13,28 @@ import Privacy from "./pages/Privacy.tsx";
 const queryClient = new QueryClient();
 const routerBase = import.meta.env.BASE_URL;
 
+function PaymentReturnRedirect() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const pay = params.get("pay");
+    if (!pay) return;
+    if (location.pathname !== "/") return;
+    navigate(`/practices/svoboda-ot-dolgov${location.search}${location.hash}`, { replace: true });
+  }, [location.hash, location.pathname, location.search, navigate]);
+
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter basename={routerBase}>
+        <PaymentReturnRedirect />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/oferta" element={<Oferta />} />

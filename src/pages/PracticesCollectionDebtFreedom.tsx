@@ -25,6 +25,11 @@ function stripPayQueryFromUrl(): void {
   window.history.replaceState({}, "", `${path}${q ? `?${q}` : ""}${hash}`);
 }
 
+function normalizeBasePath(baseUrl: string): string {
+  if (!baseUrl || baseUrl === "/") return "/";
+  return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+}
+
 const blocks = [
   {
     title: "БЛОК 1. Стоп-паника: Укрощение страха",
@@ -157,7 +162,8 @@ const PracticesCollectionDebtFreedom = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           siteOrigin: window.location.origin,
-          returnPath: "/practices/svoboda-ot-dolgov",
+          // GitHub Pages cannot open deep links directly; return to app root first.
+          returnPath: normalizeBasePath(import.meta.env.BASE_URL),
         }),
       });
       const data = (await res.json()) as { paymentUrl?: string; orderId?: string; error?: string };
