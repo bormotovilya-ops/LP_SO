@@ -13,7 +13,7 @@ export const Audience = () => (
   <section id="about" className="relative bg-background py-28 md:py-40">
     <div className="container-luxe">
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
-        <div className="lg:col-span-5">
+        <div className="order-2 lg:order-1 lg:col-span-5">
           <div className="relative">
             <div
               aria-hidden
@@ -30,7 +30,7 @@ export const Audience = () => (
             />
           </div>
         </div>
-        <div className="lg:col-span-7">
+        <div className="order-1 lg:order-2 lg:col-span-7">
           <div className="mb-6 flex items-center gap-4">
             <span className="hairline h-px w-10" />
             <span className="eyebrow">Запросы</span>

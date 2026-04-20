@@ -25,6 +25,7 @@ const SOCIALS = [
 ];
 
 const footerLinkClass = "link-underline text-foreground/85 transition-colors hover:text-accent";
+const toMainPageHash = (href: string) => (href.startsWith("#") ? `/${href}` : href);
 
 export const Footer = () => (
   <footer className="bg-surface pb-10 pt-16 md:pt-20">
@@ -93,7 +94,7 @@ export const Footer = () => (
                       {item.label}
                     </Link>
                   ) : (
-                    <a href={item.href} className={footerLinkClass}>
+                    <a href={toMainPageHash(item.href)} className={footerLinkClass}>
                       {item.label}
                     </a>
                   )}

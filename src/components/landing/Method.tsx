@@ -13,13 +13,13 @@ export const Method = () => (
           <span className="hairline h-px w-10" />
           <span className="eyebrow">Метод</span>
         </div>
-        <h2 className="font-display text-4xl leading-[1.1] text-foreground md:text-5xl">
+        <h2 className="font-display text-[2.55rem] leading-[1.08] text-foreground md:text-5xl">
           Психология,
           <br />
           <span className="italic text-accent">глубокая трансформация</span>
           <br />и персональная карта человека
         </h2>
-        <p className="mt-8 text-base leading-relaxed text-muted-foreground">
+        <p className="mt-8 text-[1.05rem] leading-relaxed text-muted-foreground md:text-base">
           Мы не будем бесконечно перебирать симптомы — разберёмся, что на самом деле стоит за
           ними. Темп подстраивается под вас — без давления, чтобы изменения успевали закрепляться
           и становились частью жизни.
@@ -46,8 +46,8 @@ export const Method = () => (
           },
         ].map((b) => (
           <div key={b.t} className="bg-surface p-8 transition-colors hover:bg-background">
-            <h3 className="font-display text-xl text-foreground">{b.t}</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{b.d}</p>
+            <h3 className="font-display text-[1.9rem] leading-[1.2] text-foreground md:text-xl">{b.t}</h3>
+            <p className="mt-3 text-base leading-relaxed text-muted-foreground md:text-sm">{b.d}</p>
           </div>
         ))}
       </div>

@@ -36,7 +36,7 @@ export const Process = () => {
             <span className="hairline h-px w-10" />
             <span className="eyebrow">Как проходит работа</span>
           </div>
-          <h2 className="font-display text-4xl leading-[1.1] text-foreground md:text-5xl">
+          <h2 className="font-display text-[2.55rem] leading-[1.08] text-foreground md:text-5xl">
             Путь — <span className="italic text-accent">экологичный</span>,
             результат — устойчивый
           </h2>
@@ -76,8 +76,8 @@ export const Process = () => {
                 >
                   {s.no}
                 </div>
-                <div className="mt-2 font-display text-lg text-foreground">{s.t}</div>
-                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{s.d}</p>
+                <div className="mt-2 font-display text-[1.5rem] leading-tight text-foreground md:text-lg">{s.t}</div>
+                <p className="mt-3 text-[1rem] leading-relaxed text-muted-foreground md:text-xs">{s.d}</p>
               </article>
             ))}
           </div>
@@ -88,7 +88,7 @@ export const Process = () => {
             «Эффект часто становится заметен сначала со стороны — окружение видит изменения
             раньше, чем сама женщина их замечает в себе».
           </p>
-          <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-6 text-base leading-relaxed text-muted-foreground md:text-sm">
             Этот формат не подходит тем, кто ищет «волшебную таблетку» без личной включенности.
             Изменения требуют готовности к регулярной и честной работе с собой.
           </p>
