@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     "<b>Оплата «Сборники практик»</b>",
     "",
     `<b>OrderId:</b> <code>${escapeHtml(orderId)}</code>`,
-    "<b>Сумма на витрине:</b> 4 990 ₽",
+    "<b>Сумма на витрине:</b> 5 ₽",
     `<b>Время (UTC):</b> <code>${escapeHtml(new Date().toISOString())}</code>`,
   ].join("\n");
 

@@ -226,7 +226,7 @@ const PracticesCollectionDebtFreedom = () => {
       <section className="py-16 md:py-20">
         <div className="container-luxe">
           <div className="mb-8 flex flex-wrap items-center gap-4 border border-accent/30 bg-[linear-gradient(115deg,hsl(var(--accent)/0.12),hsl(var(--background))_60%)] px-6 py-5 shadow-[0_16px_42px_-34px_hsl(var(--accent)/0.55)]">
-            <span className="font-display text-3xl text-accent">4 990 ₽</span>
+            <span className="font-display text-3xl text-accent">5 ₽</span>
             <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
               Разовый доступ к сборнику
             </span>
@@ -236,7 +236,7 @@ const PracticesCollectionDebtFreedom = () => {
               onClick={() => void startTbankPay()}
               className="ml-auto inline-flex items-center justify-center border border-accent bg-background/85 px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
             >
-              {paying ? "Открываем оплату..." : "Оплатить 4 990 ₽"}
+              {paying ? "Открываем оплату..." : "Оплатить 5 ₽"}
             </button>
           </div>
           {practicesPaid && (
@@ -331,7 +331,7 @@ const PracticesCollectionDebtFreedom = () => {
                 onClick={() => void startTbankPay()}
                 className="inline-flex items-center justify-center border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
               >
-                {paying ? "Открываем оплату..." : "Перейти к оплате 4 990 ₽"}
+                {paying ? "Открываем оплату..." : "Перейти к оплате 5 ₽"}
               </button>
               <Link
                 to="/#products"
