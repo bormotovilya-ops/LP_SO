@@ -9,12 +9,13 @@ export const SECTION_NAV = [
 ] as const;
 
 export const FOOTER_NAV_EXTRA = [
-  { href: "#test", label: "Тест" },
+  // Временно скрыто по запросу
+  // { href: "#test", label: "Тест" },
   { href: "#contact", label: "Диагностика" },
 ] as const;
 
 /** Отдельный блок подвала — не смешивать с якорной навигацией по лендингу */
 export const FOOTER_LEGAL_LINKS = [
   { href: "/oferta", label: "Договор-оферта" },
-  { href: "/privacy", label: "Политика конфиденциальности" },
+  { href: "/privacy", label: "Политика в отношении обработки персональных данных" },
 ] as const;

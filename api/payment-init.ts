@@ -4,8 +4,8 @@ import { createHash, randomUUID } from "crypto";
 const INIT_PROD = "https://securepay.tinkoff.ru/v2/Init";
 const INIT_TEST = "https://rest-api-test.tinkoff.ru/v2/Init";
 
-/** 10 ₽ — сумма в копейках для эквайринга Т‑Банка */
-const AMOUNT_KOPECKS = 1000;
+/** 4 990 ₽ — сумма в копейках для эквайринга Т‑Банка */
+const AMOUNT_KOPECKS = 499000;
 
 const RECEIPT_ITEM_NAME = "Сборники практик (цифровой продукт)";
 
@@ -76,6 +76,14 @@ function normalizeSiteOrigin(raw: string): string {
   return raw.trim().replace(/\/+$/, "");
 }
 
+function normalizeReturnPath(raw: unknown): string {
+  if (typeof raw !== "string") return "/";
+  const path = raw.trim();
+  if (!path.startsWith("/")) return "/";
+  if (path.startsWith("//")) return "/";
+  return path;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -103,6 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     /^http:\/\/127\.0\.0\.1(?::\d+)?$/i.test(clientOrigin);
 
   const siteOrigin = envOrigin || (clientOk ? clientOrigin : "");
+  const returnPath = normalizeReturnPath(body.returnPath);
 
   const orderId = randomUUID();
 
@@ -160,8 +169,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   if (siteOrigin) {
-    payload.SuccessURL = `${siteOrigin}/?pay=ok`;
-    payload.FailURL = `${siteOrigin}/?pay=fail`;
+    const join = (basePath: string, status: "ok" | "fail"): string => {
+      const separator = basePath.includes("?") ? "&" : "?";
+      return `${siteOrigin}${basePath}${separator}pay=${status}`;
+    };
+    payload.SuccessURL = join(returnPath, "ok");
+    payload.FailURL = join(returnPath, "fail");
     /** URL для HTTP(S)-уведомлений; совпадает с тем, что можно указать в кабинете терминала */
     payload.NotificationURL = `${siteOrigin}/api/tbank-notification`;
   }

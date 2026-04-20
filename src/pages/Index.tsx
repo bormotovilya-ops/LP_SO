@@ -7,7 +7,7 @@ import { Process } from "@/components/landing/Process";
 import { Certificates } from "@/components/landing/Certificates";
 import { Objections } from "@/components/landing/Objections";
 import { Testimonials } from "@/components/landing/Testimonials";
-import { TestSection } from "@/components/landing/TestSection";
+// import { TestSection } from "@/components/landing/TestSection";
 import { Contact } from "@/components/landing/Contact";
 import { Footer } from "@/components/landing/Footer";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
@@ -40,9 +40,10 @@ const Index = () => {
       <RevealOnScroll>
         <Testimonials />
       </RevealOnScroll>
-      <RevealOnScroll>
+      {/* Временно скрыто по запросу */}
+      {/* <RevealOnScroll>
         <TestSection />
-      </RevealOnScroll>
+      </RevealOnScroll> */}
       <RevealOnScroll>
         <Contact />
       </RevealOnScroll>

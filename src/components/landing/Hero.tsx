@@ -32,9 +32,6 @@ export const Hero = () => (
           <a href="#contact" className="btn-brass">
             Записаться на диагностику
           </a>
-          <a href="#test" className="btn-ghost-line">
-            Пройти тест
-          </a>
         </div>
 
         <div className="mt-10 grid max-w-md grid-cols-3 gap-5 border-t border-hairline pt-6">
