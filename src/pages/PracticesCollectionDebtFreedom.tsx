@@ -9,6 +9,7 @@ import {
   PRACTICES_STORAGE_KEY,
   setPracticesPaid,
 } from "@/lib/practicesPurchase";
+import { functionsApiUrl } from "@/lib/functionsApi";
 import portraitImage from "../../old/фото-16.jpg";
 
 function stripPayQueryFromUrl(): void {
@@ -109,7 +110,7 @@ const PracticesCollectionDebtFreedom = () => {
       const pendingOrderId = sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
       sessionStorage.removeItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
       if (pendingOrderId) {
-        void fetch("/api/practices-paid-notify", {
+        void fetch(functionsApiUrl("/practices-paid-notify"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ orderId: pendingOrderId }),
@@ -146,7 +147,7 @@ const PracticesCollectionDebtFreedom = () => {
   const startTbankPay = async () => {
     setPaying(true);
     try {
-      const res = await fetch("/api/payment-init", {
+      const res = await fetch(functionsApiUrl("/payment-init"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

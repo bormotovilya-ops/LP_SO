@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { functionsApiUrl } from "@/lib/functionsApi";
 
 export const Contact = () => {
   const { toast } = useToast();
@@ -18,7 +19,7 @@ export const Contact = () => {
     const message = String(formData.get("message") ?? "").trim();
 
     try {
-      const res = await fetch("/api/contact", {
+      const res = await fetch(functionsApiUrl("/contact"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
