@@ -14,8 +14,11 @@ import portraitImage from "../../old/фото-16.jpg";
 
 function stripPayQueryFromUrl(): void {
   const params = new URLSearchParams(window.location.search);
-  if (!params.has("pay")) return;
+  const hadPay = params.has("pay");
+  const hadOid = params.has("oid");
+  if (!hadPay && !hadOid) return;
   params.delete("pay");
+  params.delete("oid");
   const q = params.toString();
   const path = window.location.pathname;
   const hash = window.location.hash;
@@ -104,10 +107,12 @@ const PracticesCollectionDebtFreedom = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pay = params.get("pay");
+    const orderIdFromUrl = params.get("oid")?.trim() ?? "";
     if (pay === "ok") {
       setPracticesPaid();
       setPracticesPaidState(true);
-      const pendingOrderId = sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
+      const pendingOrderId =
+        orderIdFromUrl || sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY) || "";
       sessionStorage.removeItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
       if (pendingOrderId) {
         void fetch(functionsApiUrl("/practices-paid-notify"), {

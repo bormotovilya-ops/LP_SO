@@ -110,10 +110,11 @@ Deno.serve(async (req) => {
   const taxation = Deno.env.get("TBANK_RECEIPT_TAXATION")?.trim() || Deno.env.get("TINKOFF_RECEIPT_TAXATION")?.trim() || "usn_income";
   const itemTax = Deno.env.get("TBANK_RECEIPT_ITEM_TAX")?.trim() || Deno.env.get("TINKOFF_RECEIPT_ITEM_TAX")?.trim() || "none";
 
+  const orderId = crypto.randomUUID();
   const payload: JsonRecord = {
     TerminalKey: terminalKey,
     Amount: AMOUNT_KOPECKS,
-    OrderId: crypto.randomUUID(),
+    OrderId: orderId,
     Description: "Сборники практик",
     Receipt: {
       Email: receiptEmail,
@@ -135,7 +136,7 @@ Deno.serve(async (req) => {
   if (siteOrigin) {
     const join = (basePath: string, status: "ok" | "fail"): string => {
       const separator = basePath.includes("?") ? "&" : "?";
-      return `${siteOrigin}${basePath}${separator}pay=${status}`;
+      return `${siteOrigin}${basePath}${separator}pay=${status}&oid=${encodeURIComponent(orderId)}`;
     };
     payload.SuccessURL = join(returnPath, "ok");
     payload.FailURL = join(returnPath, "fail");
@@ -181,5 +182,5 @@ Deno.serve(async (req) => {
     );
   }
 
-  return json({ paymentUrl: gateway.PaymentURL, orderId: payload.OrderId }, 200);
+  return json({ paymentUrl: gateway.PaymentURL, orderId }, 200);
 });
