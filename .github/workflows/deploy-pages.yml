@@ -31,6 +31,8 @@ jobs:
         run: npm ci
 
       - name: Build project
+        env:
+          CUSTOM_DOMAIN_BUILD: "1"
         run: npm run build
 
       - name: Setup Pages
