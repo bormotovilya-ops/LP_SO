@@ -67,16 +67,18 @@ export const Process = () => {
                   backgroundColor: `hsl(var(--background) / ${getIntensity(idx) * 0.6})`,
                 }}
               >
-                <div className="relative z-10 mb-6 flex h-6 w-6 items-center justify-center bg-surface transition-colors duration-300">
-                  <div className="h-2 w-2 rounded-full bg-accent" />
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="relative z-10 flex h-6 w-6 items-center justify-center bg-surface transition-colors duration-300">
+                    <div className="h-2 w-2 rounded-full bg-accent" />
+                  </div>
+                  <div
+                    className="font-display text-2xl text-accent transition-transform duration-300"
+                    style={{ transform: `translateX(${getIntensity(idx) * 2}px)` }}
+                  >
+                    {s.no}
+                  </div>
                 </div>
-                <div
-                  className="font-display text-2xl text-accent transition-transform duration-300"
-                  style={{ transform: `translateX(${getIntensity(idx) * 2}px)` }}
-                >
-                  {s.no}
-                </div>
-                <div className="mt-2 font-display text-[1.5rem] leading-tight text-foreground md:text-lg">{s.t}</div>
+                <div className="font-display text-[1.5rem] leading-tight text-foreground md:text-lg">{s.t}</div>
                 <p className="mt-3 text-[1rem] leading-relaxed text-muted-foreground md:text-xs">{s.d}</p>
               </article>
             ))}
