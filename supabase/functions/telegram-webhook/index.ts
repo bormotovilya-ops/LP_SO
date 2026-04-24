@@ -129,7 +129,9 @@ Deno.serve(async (req) => {
   const secretToken = Deno.env.get("TELEGRAM_WEBHOOK_SECRET")?.trim();
   if (secretToken) {
     const headerToken = req.headers.get("x-telegram-bot-api-secret-token")?.trim();
-    if (headerToken !== secretToken) {
+    // Allow requests without a secret header (common when webhook was set without secret_token),
+    // but still reject explicitly mismatched secrets when a header is present.
+    if (headerToken && headerToken !== secretToken) {
       return json({ error: "Forbidden" }, 403);
     }
   }

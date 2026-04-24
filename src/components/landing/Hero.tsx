@@ -1,4 +1,5 @@
 import portrait from "@/assets/svetlana-portrait.jpg";
+import { Link } from "react-router-dom";
 
 export const Hero = () => (
   <section className="relative min-h-[100svh] overflow-hidden bg-surface">
@@ -32,12 +33,12 @@ export const Hero = () => (
           <a href="#contact" className="btn-brass">
             Записаться на диагностику
           </a>
-          <a
-            href="/quiz"
+          <Link
+            to="/quiz"
             className="inline-flex items-center justify-center border border-hairline px-6 py-3 text-xs uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:border-accent hover:text-accent"
           >
             Пройти тест
-          </a>
+          </Link>
         </div>
 
         <div className="mt-10 grid max-w-md grid-cols-3 gap-5 border-t border-hairline pt-6">
