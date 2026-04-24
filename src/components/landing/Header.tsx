@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { KeyRound, Menu, X } from "lucide-react";
 import { Monogram } from "./Monogram";
 import { SECTION_NAV } from "./navLinks";
+import { useSiteEditor } from "@/components/SiteEditorProvider";
 
 export const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isEditing, toggleEditing } = useSiteEditor();
 
   return (
     <header className="absolute left-0 right-0 top-0 z-40">
@@ -23,9 +25,25 @@ export const Header = () => {
             ))}
           </div>
         </nav>
-        <a href="#contact" className="hidden btn-brass md:inline-flex !px-5 !py-3 !text-[11px]">
-          Диагностика
-        </a>
+        <div className="hidden items-center gap-3 md:flex">
+          <a href="#contact" className="btn-brass !px-5 !py-3 !text-[11px]">
+            Диагностика
+          </a>
+          <button
+            type="button"
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-sm border transition-colors ${
+              isEditing
+                ? "border-accent bg-accent/10 text-accent"
+                : "border-hairline text-foreground hover:border-accent hover:text-accent"
+            }`}
+            data-site-editor-ignore="true"
+            onClick={toggleEditing}
+            aria-label={isEditing ? "Выключить редактор" : "Включить редактор"}
+            title={isEditing ? "Выключить редактор" : "Включить редактор"}
+          >
+            <KeyRound className="h-4 w-4" />
+          </button>
+        </div>
         <button
           type="button"
           aria-label={isMobileMenuOpen ? "Закрыть меню" : "Открыть меню"}
@@ -33,6 +51,7 @@ export const Header = () => {
           aria-controls="mobile-menu-panel"
           className="inline-flex items-center justify-center rounded-sm border border-hairline p-2 text-foreground transition-colors hover:border-accent hover:text-accent md:hidden"
           onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+          data-site-editor-ignore="true"
         >
           {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -65,6 +84,22 @@ export const Header = () => {
             >
               Диагностика
             </a>
+            <button
+              type="button"
+              className={`mt-3 inline-flex w-full items-center justify-center rounded-sm border px-4 py-3 transition-colors ${
+                isEditing
+                  ? "border-accent bg-accent/10 text-accent"
+                  : "border-hairline text-foreground hover:border-accent hover:text-accent"
+              }`}
+              onClick={() => {
+                toggleEditing();
+                setIsMobileMenuOpen(false);
+              }}
+              data-site-editor-ignore="true"
+              aria-label={isEditing ? "Выключить редактор" : "Включить редактор"}
+            >
+              <KeyRound className="h-4 w-4" />
+            </button>
           </nav>
         </div>
       ) : null}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { functionsApiUrl } from "@/lib/functionsApi";
+import { buildTelegramBotUrl } from "@/lib/botLinks";
 
 export const Contact = () => {
   const { toast } = useToast();
@@ -47,6 +48,11 @@ export const Contact = () => {
         title: "Заявка отправлена",
         description: "Мы свяжемся с вами по указанным контактам.",
       });
+      toast({
+        title: "Откроем Telegram-бота",
+        description: "После открытия бота обязательно нажмите Start, чтобы завершить заявку.",
+      });
+      window.open(buildTelegramBotUrl("diagnostic"), "_blank", "noopener,noreferrer");
     } catch {
       toast({
         title: "Не удалось отправить",

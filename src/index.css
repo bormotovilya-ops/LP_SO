@@ -487,6 +487,17 @@
 }
 
 @layer components {
+  [data-site-editor-editable="true"] {
+    outline: 1px dashed hsl(var(--accent) / 0.45);
+    outline-offset: 3px;
+    cursor: text;
+  }
+
+  [data-site-editor-editable="true"]:focus {
+    outline-color: hsl(var(--accent));
+    background-color: hsl(var(--accent) / 0.08);
+  }
+
   .container-luxe {
     @apply mx-auto w-full max-w-[1240px] px-6 md:px-10;
   }

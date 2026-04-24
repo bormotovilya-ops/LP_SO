@@ -51,6 +51,10 @@ const PRODUCTS: Product[] = [
     href: "/practices/svoboda-ot-dolgov",
     collections: [
       {
+        title: "Тест по дате рождения",
+        href: "/quiz",
+      },
+      {
         title: "Свобода от долгов и кредитов",
         href: "/practices/svoboda-ot-dolgov",
       },

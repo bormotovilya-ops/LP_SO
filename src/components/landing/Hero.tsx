@@ -32,6 +32,12 @@ export const Hero = () => (
           <a href="#contact" className="btn-brass">
             Записаться на диагностику
           </a>
+          <a
+            href="/quiz"
+            className="inline-flex items-center justify-center border border-hairline px-6 py-3 text-xs uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+          >
+            Пройти тест
+          </a>
         </div>
 
         <div className="mt-10 grid max-w-md grid-cols-3 gap-5 border-t border-hairline pt-6">
