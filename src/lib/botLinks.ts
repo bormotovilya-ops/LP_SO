@@ -1,6 +1,6 @@
 export type BotIntent = "diagnostic" | "present" | "razbor";
 
-const DEFAULT_BOT_USERNAME = "assistantsitebot";
+const DEFAULT_BOT_USERNAME = "OSvetlanabot";
 
 function getBotUsername(): string {
   const fromEnv = import.meta.env.VITE_TELEGRAM_BOT_USERNAME?.trim();

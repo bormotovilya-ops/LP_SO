@@ -512,7 +512,7 @@ const QuizNumerology = () => {
                           >
                             Получить подарок
                           </a>
-                          <p className="mt-1.5 text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">@assistantsitebot</p>
+                          <p className="mt-1.5 text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">@OSvetlanabot</p>
                           <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
                             После открытия бота обязательно нажми Start.
                           </p>
