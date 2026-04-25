@@ -1,8 +1,8 @@
 /** Ключ в localStorage; можно слушать `storage` в других вкладках */
 export const PRACTICES_STORAGE_KEY = "lp_so_practices_paid_v1";
 
-/** sessionStorage: OrderId из Init до возврата с формы Т‑Банка (для уведомления в Telegram) */
-export const PRACTICES_PENDING_ORDER_SESSION_KEY = "lp_so_pending_tbank_order";
+/** sessionStorage: OrderId из Init до возврата с формы оплаты (для уведомления в Telegram) */
+export const PRACTICES_PENDING_ORDER_SESSION_KEY = "lp_so_pending_payment_order_v1";
 
 export type PracticesPaidRecord = {
   /** ISO-время фиксации успешной оплаты (редирект с ?pay=ok) */

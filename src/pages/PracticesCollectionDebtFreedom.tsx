@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Footer } from "@/components/landing/Footer";
@@ -85,6 +85,8 @@ const PracticesCollectionDebtFreedom = () => {
   const { toast } = useToast();
   const [paying, setPaying] = useState(false);
   const [practicesPaid, setPracticesPaidState] = useState(false);
+  const [receiptEmail, setReceiptEmail] = useState("");
+  const paymentStartRef = useRef(false);
 
   const materialsHref = useMemo(() => {
     const fromEnv = import.meta.env.VITE_PRACTICES_MATERIALS_URL?.trim();
@@ -154,13 +156,28 @@ const PracticesCollectionDebtFreedom = () => {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const startTbankPay = async () => {
+  const startPayment = async () => {
+    if (paymentStartRef.current || paying) return;
+
+    const email = receiptEmail.trim();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!emailOk) {
+      toast({
+        title: "Укажите email для чека",
+        description: "Перед оплатой нужно ввести корректный email, на него придет кассовый чек.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    paymentStartRef.current = true;
     setPaying(true);
     try {
       const res = await fetch(functionsApiUrl("/payment-init"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          receiptEmail: email,
           siteOrigin: window.location.origin,
           // GitHub Pages cannot open deep links directly; return to app root first.
           returnPath: normalizeBasePath(import.meta.env.BASE_URL),
@@ -173,10 +190,8 @@ const PracticesCollectionDebtFreedom = () => {
       if (data.orderId) {
         sessionStorage.setItem(PRACTICES_PENDING_ORDER_SESSION_KEY, data.orderId);
       }
-      const w = window.open(data.paymentUrl, "_blank", "noopener,noreferrer");
-      if (!w) {
-        window.location.assign(data.paymentUrl);
-      }
+      // Open payment in the current tab to avoid popup blockers and duplicate windows.
+      window.location.assign(data.paymentUrl);
     } catch {
       toast({
         title: "Оплата недоступна",
@@ -184,6 +199,7 @@ const PracticesCollectionDebtFreedom = () => {
         variant: "destructive",
       });
     } finally {
+      paymentStartRef.current = false;
       setPaying(false);
     }
   };
@@ -241,10 +257,26 @@ const PracticesCollectionDebtFreedom = () => {
             <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
               Разовый доступ к сборнику
             </span>
+            <label className="min-w-[240px] flex-1">
+              <span className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                Email для чека
+              </span>
+              <input
+                type="email"
+                value={receiptEmail}
+                onChange={(e) => setReceiptEmail(e.target.value)}
+                placeholder="name@example.com"
+                autoComplete="email"
+                className="w-full border border-hairline bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-accent"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                На этот адрес придет кассовый чек и подтверждение оплаты.
+              </span>
+            </label>
             <button
               type="button"
               disabled={paying}
-              onClick={() => void startTbankPay()}
+              onClick={() => void startPayment()}
               className="ml-auto inline-flex items-center justify-center border border-accent bg-background/85 px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
             >
               {paying ? "Открываем оплату..." : "Оплатить 5 ₽"}
@@ -339,7 +371,7 @@ const PracticesCollectionDebtFreedom = () => {
               <button
                 type="button"
                 disabled={paying}
-                onClick={() => void startTbankPay()}
+                onClick={() => void startPayment()}
                 className="inline-flex items-center justify-center border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
               >
                 {paying ? "Открываем оплату..." : "Перейти к оплате 5 ₽"}
