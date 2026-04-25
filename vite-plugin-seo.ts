@@ -42,8 +42,21 @@ function relativeGraphIds(viteBase: string): { websiteId: string; personId: stri
   };
 }
 
+function resolveSiteUrl(projectRoot: string): string | null {
+  const fromEnv = process.env.VITE_SITE_URL?.trim();
+  if (fromEnv) return fromEnv;
+
+  const cnamePath = path.join(projectRoot, "public", "CNAME");
+  if (!fs.existsSync(cnamePath)) return null;
+
+  const domain = fs.readFileSync(cnamePath, "utf8").trim();
+  if (!domain) return null;
+  if (/^https?:\/\//i.test(domain)) return domain;
+  return `https://${domain}`;
+}
+
 const DEFAULT_ROBOTS = [
-  "# Sitemap: … добавляется при сборке, если задана переменная VITE_SITE_URL (https://ваш-домен).",
+  "# Sitemap: … добавляется при сборке из VITE_SITE_URL или public/CNAME.",
   "",
   "User-agent: Googlebot",
   "Allow: /",
@@ -64,18 +77,20 @@ const DEFAULT_ROBOTS = [
 export function seoBuildPlugin(): Plugin {
   let viteBase = "/";
   let outDir = "dist";
+  let projectRoot = process.cwd();
 
   return {
     name: "seo-build",
     apply: "build",
     configResolved(config) {
       viteBase = config.base;
+      projectRoot = config.root;
       outDir = path.resolve(config.root, config.build.outDir);
     },
     transformIndexHtml: {
       order: "post",
       handler(html) {
-        const site = process.env.VITE_SITE_URL?.trim();
+        const site = resolveSiteUrl(projectRoot);
         if (!site) return html;
 
         const origin = trimTrailingSlash(site);
@@ -107,7 +122,7 @@ export function seoBuildPlugin(): Plugin {
       },
     },
     closeBundle() {
-      const site = process.env.VITE_SITE_URL?.trim();
+      const site = resolveSiteUrl(projectRoot);
       const lines = [...DEFAULT_ROBOTS];
       if (site) {
         const origin = trimTrailingSlash(site);
