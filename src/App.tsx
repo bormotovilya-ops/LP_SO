@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { HashRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,8 +13,6 @@ import Privacy from "./pages/Privacy.tsx";
 import QuizNumerology from "./pages/QuizNumerology.tsx";
 
 const queryClient = new QueryClient();
-const routerBase = import.meta.env.BASE_URL;
-
 function PaymentReturnRedirect() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,10 +33,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter
-        basename={routerBase}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
+      <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <SiteEditorProvider>
           <PaymentReturnRedirect />
           <Routes>
@@ -51,7 +46,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </SiteEditorProvider>
-      </BrowserRouter>
+      </HashRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
