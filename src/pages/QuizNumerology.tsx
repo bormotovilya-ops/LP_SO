@@ -192,6 +192,10 @@ const QuizNumerology = () => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, []);
+
   const focusLabel = useMemo(
     () => (focus ? focusOptions.find((f) => f.key === focus)?.label : null),
     [focus]
@@ -505,7 +509,7 @@ const QuizNumerology = () => {
                         </div>
                         <div className="flex min-h-0 flex-col">
                           <a
-                            href={buildTelegramBotUrl("present")}
+                            href={buildTelegramBotUrl("present", { giftTrack: focus ?? undefined })}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex min-h-11 w-full items-center justify-center border border-hairline bg-background/60 px-3 py-2.5 text-center text-[11px] font-medium uppercase leading-tight tracking-[0.1em] text-muted-foreground transition-colors hover:border-muted-foreground/30 hover:bg-background hover:text-foreground sm:min-h-[3rem] sm:text-xs"

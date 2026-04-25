@@ -3,7 +3,9 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 const TG_API = "https://api.telegram.org";
 
 type StartIntent = "diagnostic" | "present" | "razbor";
+type GiftTrack = "fear" | "money" | "relations";
 type JsonObject = Record<string, unknown>;
+type StartPayload = { intent: StartIntent; giftTrack: GiftTrack | null };
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -12,26 +14,31 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-function parseIntentFromPayload(payload: string): StartIntent | null {
-  const match = /^src_site_goal_(diagnostic|present|razbor)$/i.exec(payload.trim());
+function parseStartPayload(payload: string): StartPayload | null {
+  const match = /^src_site_goal_(diagnostic|present|razbor)(?:_(fear|money|relations))?$/i.exec(payload.trim());
   if (!match) return null;
-  return match[1].toLowerCase() as StartIntent;
+  return {
+    intent: match[1].toLowerCase() as StartIntent,
+    giftTrack: (match[2]?.toLowerCase() as GiftTrack | undefined) ?? null,
+  };
 }
 
-function getStartIntent(update: JsonObject): StartIntent | null {
+function getStartPayload(update: JsonObject): StartPayload | null {
   const message = update.message;
-  if (!message || typeof message !== "object") return null;
-  const text = typeof (message as JsonObject).text === "string" ? (message as JsonObject).text : "";
-  if (!text.startsWith("/start")) return null;
+  if (!message || typeof message !== "object") return { intent: "diagnostic", giftTrack: null };
+  const maybeText = (message as JsonObject).text;
+  const text = typeof maybeText === "string" ? maybeText : "";
+  if (!text.startsWith("/start")) return { intent: "diagnostic", giftTrack: null };
   const payload = text.replace("/start", "").trim();
-  if (!payload) return "diagnostic";
-  return parseIntentFromPayload(payload);
+  if (!payload) return { intent: "diagnostic", giftTrack: null };
+  return parseStartPayload(payload) ?? { intent: "diagnostic", giftTrack: null };
 }
 
 function isStartCommand(update: JsonObject): boolean {
   const message = update.message;
   if (!message || typeof message !== "object") return false;
-  const text = typeof (message as JsonObject).text === "string" ? (message as JsonObject).text.trim() : "";
+  const maybeText = (message as JsonObject).text;
+  const text = typeof maybeText === "string" ? maybeText.trim() : "";
   return text.startsWith("/start");
 }
 
@@ -66,9 +73,22 @@ function buildWelcomeText(intent: StartIntent | null, firstName: string): string
   return `${namePart}добро пожаловать! 👋\n\nМы получили вашу заявку с сайта. Чтобы не потерять связь, оставайтесь в этом боте — сюда придут следующие шаги.`;
 }
 
+function buildGiftStubText(giftTrack: GiftTrack | null): string {
+  if (giftTrack === "fear") {
+    return "Подарок 1/3 (заглушка): файл «Первый шаг из страха.pdf». Скоро заменим на финальный материал.";
+  }
+  if (giftTrack === "money") {
+    return "Подарок 2/3 (заглушка): файл «Денежные утечки.pdf». Скоро заменим на финальный материал.";
+  }
+  if (giftTrack === "relations") {
+    return "Подарок 3/3 (заглушка): файл «Честный разговор.pdf». Скоро заменим на финальный материал.";
+  }
+  return "Подарок (заглушка): файл «Твой подарок.pdf». Скоро заменим на финальный материал.";
+}
+
 function buildUnifiedGreeting(firstName: string): string {
   const namePart = firstName ? `${firstName}, ` : "";
-  return `${namePart}добро пожаловать! 👋\n\nСпасибо, что вы с нами. Ниже отправим следующий шаг по вашей заявке.`;
+  return `${namePart}добро пожаловать! 👋`;
 }
 
 async function sendTelegram(token: string, method: string, payload: Record<string, unknown>): Promise<boolean> {
@@ -95,6 +115,7 @@ async function notifyChannel(
   token: string,
   channelId: string,
   intent: StartIntent | null,
+  giftTrack: GiftTrack | null,
   from: JsonObject | null,
 ): Promise<void> {
   const userId = typeof from?.id === "number" ? String(from.id) : "unknown";
@@ -104,6 +125,7 @@ async function notifyChannel(
     "Пользователь запустил бота",
     `Источник: site`,
     `Метка: ${intent ?? "unknown"}`,
+    `Подарок: ${giftTrack ?? "default"}`,
     `User ID: ${userId}`,
     `Username: ${username}`,
     `Имя: ${firstName || "—"}`,
@@ -147,7 +169,9 @@ Deno.serve(async (req) => {
     return json({ ok: true, skipped: true, reason: "not_start_command" }, 200);
   }
 
-  const intent = getStartIntent(update);
+  const startPayload = getStartPayload(update);
+  const intent = startPayload?.intent ?? null;
+  const giftTrack = startPayload?.giftTrack ?? null;
   const from = getMessageFrom(update);
   const chatId = getChatId(update);
   if (!chatId) return json({ ok: true, skipped: true });
@@ -176,9 +200,20 @@ Deno.serve(async (req) => {
     return json({ error: "Telegram delivery failed" }, 502);
   }
 
+  if (intent === "present") {
+    const giftDelivered = await sendTelegram(token, "sendMessage", {
+      chat_id: chatId,
+      text: buildGiftStubText(giftTrack),
+      disable_web_page_preview: true,
+    });
+    if (!giftDelivered) {
+      return json({ error: "Telegram delivery failed" }, 502);
+    }
+  }
+
   const channelId = Deno.env.get("TELEGRAM_CHANNEL_ID")?.trim();
   if (channelId) {
-    await notifyChannel(token, channelId, intent, from);
+    await notifyChannel(token, channelId, intent, giftTrack, from);
   }
 
   return json({ ok: true, intent: intent ?? "unknown" }, 200);
