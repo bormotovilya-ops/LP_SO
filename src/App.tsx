@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { HashRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { HashRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,6 +28,20 @@ function PaymentReturnRedirect() {
   return null;
 }
 
+function IndexSectionAlias() {
+  const { section } = useParams();
+
+  useEffect(() => {
+    if (!section) return;
+    const id = window.setTimeout(() => {
+      document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [section]);
+
+  return <Index />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -42,6 +56,7 @@ const App = () => (
             <Route path="/practices/svoboda-ot-dolgov" element={<PracticesCollectionDebtFreedom />} />
             <Route path="/quiz" element={<QuizNumerology />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/:section" element={<IndexSectionAlias />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
