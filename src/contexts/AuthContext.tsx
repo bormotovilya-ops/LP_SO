@@ -86,7 +86,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured()) {
-      return { error: new Error("Supabase не настроен (VITE_*)") };
+      return { error: new Error("Supabase: задайте SUPABASE_URL / SUPABASE_ANON_KEY (или VITE_*)") };
     }
     const supabase = getSupabase();
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });

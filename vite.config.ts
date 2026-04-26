@@ -8,7 +8,10 @@ import { seoBuildPlugin } from "./vite-plugin-seo";
 // (local .env, GitHub Actions). Имена как в Supabase (SUPABASE_*) или VITE_* — мержим.
 // SERVICE_ROLE в клиент никогда не прокидывать.
 function pickEnv(mode: string) {
-  const fromFiles = loadEnv(mode, process.cwd(), "");
+  // VITE_ отдельно + все ключи из .env (в т.ч. SUPABASE_* без префикса) через prefix ''.
+  const withAll = loadEnv(mode, process.cwd(), "");
+  const withVite = loadEnv(mode, process.cwd(), "VITE_");
+  const fromFiles = { ...withAll, ...withVite };
   const p = (key: string) => String(process.env[key] ?? fromFiles[key] ?? "").trim();
   const supabaseUrl = p("SUPABASE_URL") || p("VITE_SUPABASE_URL");
   const supabaseAnon = p("SUPABASE_ANON_KEY") || p("VITE_SUPABASE_ANON_KEY");
