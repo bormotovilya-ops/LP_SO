@@ -19,8 +19,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     # ВАЖНО: не вешать здесь `environment: github-pages` — job часто падает/зависает (reviewers, policy).
-    # Секреты для сборки: только **Repository** secrets (Settings ^→ Secrets and variables ^→ Actions, вкладка «Repository»).
-    # Значения из Environment (только среда) сюда не попадут — дублируйте SUPABASE_URL / SUPABASE_ANON_KEY в Repository.
+    # CRM для Vite: **Repository secrets** и/или **Repository variables** (Settings → Secrets and variables → Actions).
+    # Имена: SUPABASE_URL, SUPABASE_ANON_KEY (в workflow: secrets || vars — сначала Secrets, иначе Variables).
     steps:
       - name: Link to this workflow run
         run: echo "Run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
@@ -37,28 +37,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Секреты: Repository → Settings → Secrets and variables → **Actions** (вкладка «Repository»).
-      # Не только Environment: job build без environment не видит секреты только у Environment.
-      # Имена: SUPABASE_URL, SUPABASE_ANON_KEY (как в Supabase API) и/или VITE_*.
-      - name: Check CRM repository secrets
+      # Pairs: Repository Secrets **или** Repository Variables (одинаковые имена).
+      - name: Check CRM env (secrets or variables)
         env:
-          SUPA_URL: ${{ secrets.SUPABASE_URL }}
-          SUPA_ANON: ${{ secrets.SUPABASE_ANON_KEY }}
-          VURL: ${{ secrets.VITE_SUPABASE_URL }}
-          VANON: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPA_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          SUPA_ANON: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+          VURL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VANON: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
         run: |
           if { [ -n "$SUPA_URL" ] && [ -n "$SUPA_ANON" ]; } || { [ -n "$VURL" ] && [ -n "$VANON" ]; }; then
-            echo "::notice::CRM env: набор secret-ов (SUPABASE_* или VITE_*) задан"
+            echo "::notice::CRM: задана пара SUPABASE_* или VITE_* (secrets и/или variables)"
           else
-            echo "::warning::CRM: нет пары (SUPABASE_URL+SUPABASE_ANON_KEY) или (VITE_SUPABASE_URL+VITE_SUPABASE_ANON_KEY) в **Repository** Actions secrets — ключ на сайте не заработает. Не путай с секретами только в Environment."
+            echo "::warning::CRM: пусто. Добавь в репо Actions → **Secrets** или **Variables** пары URL+anon (имена: SUPABASE_URL, SUPABASE_ANON_KEY) или VITE_*. Только Environments (без дублирования в репо) build не увидит."
           fi
 
-      - name: Debug CRM secret presence (lengths only)
+      - name: Debug CRM presence (lengths only)
         env:
-          S_U: ${{ secrets.SUPABASE_URL }}
-          S_A: ${{ secrets.SUPABASE_ANON_KEY }}
-          V_U: ${{ secrets.VITE_SUPABASE_URL }}
-          V_A: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          S_U: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          S_A: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+          V_U: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          V_A: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
         run: |
           echo "Lengths: SUPABASE_URL=${#S_U} SUPABASE_ANON_KEY=${#S_A} VITE_URL=${#V_U} VITE_ANON=${#V_A}"
           if { [ -n "$S_U" ] && [ -n "$S_A" ]; } || { [ -n "$V_U" ] && [ -n "$V_A" ]; }; then
@@ -79,22 +77,22 @@ jobs:
           [ -n "$S_F" ] && printf "FUNCTIONS_BASE_URL=%s\n" "$S_F" >> .env.production
           [ -n "$V_F" ] && printf "VITE_SUPABASE_FUNCTIONS_BASE_URL=%s\n" "$V_F" >> .env.production
         env:
-          S_U: ${{ secrets.SUPABASE_URL }}
-          S_A: ${{ secrets.SUPABASE_ANON_KEY }}
-          S_F: ${{ secrets.FUNCTIONS_BASE_URL }}
-          V_U: ${{ secrets.VITE_SUPABASE_URL }}
-          V_A: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          V_F: ${{ secrets.VITE_SUPABASE_FUNCTIONS_BASE_URL }}
+          S_U: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          S_A: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+          S_F: ${{ secrets.FUNCTIONS_BASE_URL || vars.FUNCTIONS_BASE_URL }}
+          V_U: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          V_A: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+          V_F: ${{ secrets.VITE_SUPABASE_FUNCTIONS_BASE_URL || vars.VITE_SUPABASE_FUNCTIONS_BASE_URL }}
 
       - name: Build project
         env:
           CUSTOM_DOMAIN_BUILD: "1"
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          FUNCTIONS_BASE_URL: ${{ secrets.FUNCTIONS_BASE_URL }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SUPABASE_FUNCTIONS_BASE_URL: ${{ secrets.VITE_SUPABASE_FUNCTIONS_BASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+          FUNCTIONS_BASE_URL: ${{ secrets.FUNCTIONS_BASE_URL || vars.FUNCTIONS_BASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_FUNCTIONS_BASE_URL: ${{ secrets.VITE_SUPABASE_FUNCTIONS_BASE_URL || vars.VITE_SUPABASE_FUNCTIONS_BASE_URL }}
         run: npm run build
 
       - name: Setup Pages
