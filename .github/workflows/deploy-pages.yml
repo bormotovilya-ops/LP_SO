@@ -30,9 +30,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # В репозитории: Settings → Secrets and variables → Actions
+      # (опционально, для CRM / env): VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_SUPABASE_FUNCTIONS_BASE_URL
       - name: Build project
         env:
           CUSTOM_DOMAIN_BUILD: "1"
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_FUNCTIONS_BASE_URL: ${{ secrets.VITE_SUPABASE_FUNCTIONS_BASE_URL }}
         run: npm run build
 
       - name: Setup Pages
