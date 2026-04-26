@@ -26,7 +26,7 @@ export function getSupabase(): SupabaseClient {
   if (import.meta.env.DEV && (!url || !anon) && !missingEnvWarned) {
     missingEnvWarned = true;
     console.warn(
-      "[CRM] В корневом .env задайте SUPABASE_URL и SUPABASE_ANON_KEY (или VITE_*) — значения из Supabase → API. Для GitHub Pages — Secrets + пересборка.",
+      "[CRM] В .env задайте SUPABASE_URL и SUPABASE_ANON_KEY (значения из Supabase → API) или пару VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. GitHub Pages — repository Actions secrets и push в main.",
     );
   }
   if (client && lastUrl === url && lastAnon === anon) {

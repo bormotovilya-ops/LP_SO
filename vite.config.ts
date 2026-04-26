@@ -1,19 +1,50 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { seoBuildPlugin } from "./vite-plugin-seo";
 
-// Сайт на GitHub Pages: при `npm run build` переменные приходят из process.env
-// (local .env, GitHub Actions). Имена как в Supabase (SUPABASE_*) или VITE_* — мержим.
+/** Ключи CRM для .env: не использовать loadEnv(..., ''), в Vite это даёт весь process.env. */
+const CRM_ENV_KEYS = [
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  "FUNCTIONS_BASE_URL",
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_ANON_KEY",
+  "VITE_SUPABASE_FUNCTIONS_BASE_URL",
+] as const;
+
+function readCrmKeysFromEnvFiles(envDir: string, mode: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const allow = new Set<string>(CRM_ENV_KEYS);
+  for (const f of [join(envDir, ".env"), join(envDir, ".env.local"), join(envDir, `.env.${mode}`), join(envDir, `.env.${mode}.local`)]) {
+    if (!existsSync(f)) continue;
+    for (const raw of readFileSync(f, "utf-8").split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || line.startsWith("#")) continue;
+      const eq = line.indexOf("=");
+      if (eq < 0) continue;
+      const k = line.slice(0, eq).trim();
+      if (!allow.has(k)) continue;
+      let v = line.slice(eq + 1).trim();
+      if (v.length >= 2) {
+        const q = v[0];
+        if ((q === '"' && v.endsWith('"')) || (q === "'" && v.endsWith("'"))) v = v.slice(1, -1);
+      }
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+// Сайт на GitHub Pages: `npm run build` — process.env (Actions), .env* (Vite loadEnv VITE_ + явный parse SUPABASE_*).
 // SERVICE_ROLE в клиент никогда не прокидывать.
 function pickEnv(mode: string) {
-  // VITE_ отдельно + все ключи из .env (в т.ч. SUPABASE_* без префикса) через prefix ''.
-  const withAll = loadEnv(mode, process.cwd(), "");
-  const withVite = loadEnv(mode, process.cwd(), "VITE_");
-  const fromFiles = { ...withAll, ...withVite };
-  const p = (key: string) => String(process.env[key] ?? fromFiles[key] ?? "").trim();
+  const fromFiles = readCrmKeysFromEnvFiles(process.cwd(), mode);
+  const viteFromFiles = loadEnv(mode, process.cwd(), "VITE_");
+  const p = (key: string) => String(process.env[key] ?? fromFiles[key] ?? viteFromFiles[key] ?? "").trim();
   const supabaseUrl = p("SUPABASE_URL") || p("VITE_SUPABASE_URL");
   const supabaseAnon = p("SUPABASE_ANON_KEY") || p("VITE_SUPABASE_ANON_KEY");
   let functionsBase = p("VITE_SUPABASE_FUNCTIONS_BASE_URL") || p("FUNCTIONS_BASE_URL");

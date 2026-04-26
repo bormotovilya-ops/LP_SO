@@ -65,7 +65,9 @@ jobs:
           u="$S_U"; a="$S_A"
           if [ -z "$u" ] || [ -z "$a" ]; then u="$V_U"; a="$V_A"; fi
           if [ -n "$u" ] && [ -n "$a" ]; then
+            # SUPABASE_* для pickEnv; VITE_* — для import.meta.env.* в Vite (дублируем те же значения).
             printf "SUPABASE_URL=%s\nSUPABASE_ANON_KEY=%s\n" "$u" "$a" >> .env.production
+            printf "VITE_SUPABASE_URL=%s\nVITE_SUPABASE_ANON_KEY=%s\n" "$u" "$a" >> .env.production
           fi
           [ -n "$S_F" ] && printf "FUNCTIONS_BASE_URL=%s\n" "$S_F" >> .env.production
           [ -n "$V_F" ] && printf "VITE_SUPABASE_FUNCTIONS_BASE_URL=%s\n" "$V_F" >> .env.production

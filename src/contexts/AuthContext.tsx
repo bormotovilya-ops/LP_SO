@@ -86,7 +86,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured()) {
-      return { error: new Error("Supabase: задайте SUPABASE_URL / SUPABASE_ANON_KEY (или VITE_*)") };
+      return {
+        error: new Error(
+          "CRM: не настроен Supabase. Локально — в корне .env укажите SUPABASE_URL и SUPABASE_ANON_KEY (или VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY). На GitHub Pages — repository secrets с теми же именами и новый deploy.",
+        ),
+      };
     }
     const supabase = getSupabase();
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
