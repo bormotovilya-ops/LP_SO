@@ -17,6 +17,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Без `environment` job не видит секреты, созданные **только** в Environment (а не в Repository).
+    # При необходимости уберите строку, если build начнёт ждать approval.
+    environment: github-pages
     steps:
       - name: Checkout
         uses: actions/checkout@v4

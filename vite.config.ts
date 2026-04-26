@@ -62,6 +62,11 @@ const appVersion = JSON.parse(readFileSync(path.join(__dirname, "package.json"),
 
 export default defineConfig(({ mode }) => {
   const { supabaseUrl, supabaseAnon, functionsBase } = pickEnv(mode);
+  if (process.env.CI === "true" && process.env.CUSTOM_DOMAIN_BUILD === "1" && (!supabaseUrl || !supabaseAnon)) {
+    throw new Error(
+      "GitHub CI: пустой CRM. Секреты должны быть в **Repository** Actions (или в Environment, см. build job) — SUPABASE_URL и SUPABASE_ANON_KEY; при необходимости VITE_*. См. логи шага Check/Debug CRM; Environment-only без environment у job = пусто.",
+    );
+  }
   return {
     base:
       mode === "development" || process.env.VERCEL || process.env.CUSTOM_DOMAIN_BUILD === "1"

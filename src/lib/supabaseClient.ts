@@ -1,17 +1,15 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-/** Сборка: vite `define` __CRM_* из SUPABASE_* / VITE_*; запас: import.meta.env.VITE_* */
+/** Сборка: `define` __CRM_*; запас: import.meta.env.VITE_*. После define не используем `typeof` — там уже строка. */
 function readCrmUrl(): string {
-  if (typeof __CRM_SUPABASE_URL__ !== "undefined" && String(__CRM_SUPABASE_URL__).trim()) {
-    return String(__CRM_SUPABASE_URL__).trim();
-  }
+  const a = String(__CRM_SUPABASE_URL__ ?? "").trim();
+  if (a) return a;
   return String(import.meta.env.VITE_SUPABASE_URL ?? "").trim();
 }
 
 function readCrmAnon(): string {
-  if (typeof __CRM_SUPABASE_ANON_KEY__ !== "undefined" && String(__CRM_SUPABASE_ANON_KEY__).trim()) {
-    return String(__CRM_SUPABASE_ANON_KEY__).trim();
-  }
+  const a = String(__CRM_SUPABASE_ANON_KEY__ ?? "").trim();
+  if (a) return a;
   return String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 }
 
