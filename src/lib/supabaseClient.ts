@@ -5,7 +5,7 @@ const anon = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? "";
 
 if (import.meta.env.DEV && (!url || !anon)) {
   console.warn(
-    "[CRM] Добавьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY (см. .env.example) для входа в админку.",
+    "[CRM] В .env или в GitHub Actions Secrets задайте URL и anon (имена SUPABASE_* или VITE_*, как в .env.example). Значения — из Supabase → Settings → API.",
   );
 }
 

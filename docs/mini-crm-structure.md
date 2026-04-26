@@ -170,7 +170,7 @@ Mini-CRM нужна для управления лидами без абонен
 
 1. Применить миграции (`01_apply_migrations.ps1`).
 2. Убедиться, что в `crm_pipeline_stages` появились этапы.
-3. Секреты Edge Functions: `SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` **задаёт платформа** (системные), руками через `supabase secrets set` их обычно не добавляют. Для веб-CRM в `.env` фронтенда нужны **`VITE_SUPABASE_URL`** и **`VITE_SUPABASE_ANON_KEY`** (публичный anon из Dashboard → API).
+3. **Edge Functions** (Supabase): системные `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` в рантайме; для CLI иногда `supabase secrets set`. **Веб-CRM на GitHub Pages:** публичные URL и **anon** берутся из **Supabase → Settings → API** и кладутся в **репозиторий GitHub → Settings → Secrets and variables → Actions** (именами `SUPABASE_URL`, `SUPABASE_ANON_KEY`, при необходимости `FUNCTIONS_BASE_URL` — как в дашборде, или `VITE_*` — см. `vite.config`). Vite на сборке мержет их в `import.meta.env.VITE_*`. **`SUPABASE_SERVICE_ROLE_KEY` в фронт не передавать.**
 4. Деплой edge-функций:
    - `npx supabase functions deploy crm-lead-upsert`
    - `npx supabase functions deploy crm-bot-event`

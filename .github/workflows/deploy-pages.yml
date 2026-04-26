@@ -30,11 +30,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # В репозитории: Settings → Secrets and variables → Actions
-      # (опционально, для CRM / env): VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_SUPABASE_FUNCTIONS_BASE_URL
+      # Значения взять из Supabase: Project → Settings → API. Хранить в репо:
+      # Settings → Secrets and variables → Actions.
+      # Подойдут имена как в UI Supabase (SUPABASE_*) или VITE_* — vite.config мержит оба.
       - name: Build project
         env:
           CUSTOM_DOMAIN_BUILD: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          FUNCTIONS_BASE_URL: ${{ secrets.FUNCTIONS_BASE_URL }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SUPABASE_FUNCTIONS_BASE_URL: ${{ secrets.VITE_SUPABASE_FUNCTIONS_BASE_URL }}
