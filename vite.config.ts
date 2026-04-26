@@ -58,13 +58,16 @@ function pickEnv(mode: string) {
 // На Vercel (если снова) VERCEL=1 — корень сайта. На GitHub Pages: CUSTOM_DOMAIN_BUILD=1 в workflow.
 // For custom domain on GitHub Pages set CUSTOM_DOMAIN_BUILD=1 to also use "/".
 // https://vitejs.dev/config/
-const appVersion = JSON.parse(readFileSync(path.join(__dirname, "package.json"), "utf-8")).version as string;
+function readPackageVersion(): string {
+  return JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8")).version as string;
+}
 
 export default defineConfig(({ mode }) => {
+  const appVersion = readPackageVersion();
   const { supabaseUrl, supabaseAnon, functionsBase } = pickEnv(mode);
   if (process.env.CI === "true" && process.env.CUSTOM_DOMAIN_BUILD === "1" && (!supabaseUrl || !supabaseAnon)) {
     throw new Error(
-      "GitHub CI: пустой CRM. Секреты должны быть в **Repository** Actions (или в Environment, см. build job) — SUPABASE_URL и SUPABASE_ANON_KEY; при необходимости VITE_*. См. логи шага Check/Debug CRM; Environment-only без environment у job = пусто.",
+      "CI: пустой SUPABASE в сборке. Добавь в GitHub: Settings → Secrets → Actions (вкладка «Repository») пары SUPABASE_URL и SUPABASE_ANON_KEY. Секреты только в Environment (без дублирования в Repository) job build НЕ видит. См. длины в шаге с Debug CRM.",
     );
   }
   return {
