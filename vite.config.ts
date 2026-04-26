@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -26,6 +27,8 @@ function pickEnv(mode: string) {
 // На Vercel (если снова) VERCEL=1 — корень сайта. На GitHub Pages: CUSTOM_DOMAIN_BUILD=1 в workflow.
 // For custom domain on GitHub Pages set CUSTOM_DOMAIN_BUILD=1 to also use "/".
 // https://vitejs.dev/config/
+const appVersion = JSON.parse(readFileSync(path.join(__dirname, "package.json"), "utf-8")).version as string;
+
 export default defineConfig(({ mode }) => {
   const { supabaseUrl, supabaseAnon, functionsBase } = pickEnv(mode);
   return {
@@ -35,6 +38,7 @@ export default defineConfig(({ mode }) => {
         : "/LP_SO/",
     // Не класть в import.meta.env.VITE_* — плагин env перезаписывает, в Pages приходили пустые.
     define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
       __CRM_SUPABASE_URL__: JSON.stringify(supabaseUrl),
       __CRM_SUPABASE_ANON_KEY__: JSON.stringify(supabaseAnon),
       __CRM_FUNCTIONS_BASE_URL__: JSON.stringify(functionsBase),

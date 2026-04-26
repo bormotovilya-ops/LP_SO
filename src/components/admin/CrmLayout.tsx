@@ -56,6 +56,7 @@ export function CrmLayout() {
       </header>
       <main className="container-luxe py-8">
         <Outlet />
+        <p className="pt-8 text-center text-[10px] text-muted-foreground/70">LP_SO · {__APP_VERSION__}</p>
       </main>
     </div>
   );

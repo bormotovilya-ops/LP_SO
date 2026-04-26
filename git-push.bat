@@ -4,8 +4,9 @@ setlocal enabledelayedexpansion
 REM Usage:
 REM   git-push.bat "your commit message"
 REM If message is omitted, default one will be used.
-REM Коммит всегда идёт в ТЕКУЩУЮ ветку. GitHub Pages деплоится с main:
-REM   на ветке main — пуш в origin/main; иначе — пуш текущей ветки + подсказка слить в main.
+REM GitHub Pages собирает только main. Пока вы на dev-crm — пуш идёт в dev-crm.
+REM Чтобы выложить на сайт: git-merge-to-main.bat (создаёт main с merge dev-crm).
+REM Коммит всегда в ТЕКУЩУЮ ветку. На main — пуш в origin/main; иначе — пуш ветки + подсказка.
 
 set "MSG=%~1"
 if "%MSG%"=="" set "MSG=Update project files"
