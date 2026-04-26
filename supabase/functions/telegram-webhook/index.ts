@@ -1,4 +1,5 @@
-import "@supabase/functions-js/edge-runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const TG_API = "https://api.telegram.org";
 
@@ -138,6 +139,70 @@ async function notifyChannel(
   });
 }
 
+async function saveCrmBotEvent(
+  update: JsonObject,
+  intent: StartIntent | null,
+  giftTrack: GiftTrack | null,
+): Promise<void> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRole) return;
+
+  const from = getMessageFrom(update);
+  const message = update.message && typeof update.message === "object" ? (update.message as JsonObject) : null;
+  const text = typeof message?.text === "string" ? message.text : "";
+  const firstName = typeof from?.first_name === "string" ? from.first_name : "";
+  const lastName = typeof from?.last_name === "string" ? from.last_name : "";
+  const fullName = `${firstName} ${lastName}`.trim();
+  const telegramId = typeof from?.id === "number" ? from.id : null;
+
+  if (!telegramId) return;
+
+  const client = createClient(supabaseUrl, serviceRole, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  await client.rpc("crm_upsert_contact", {
+    p_full_name: fullName || null,
+    p_telegram_id: telegramId,
+    p_source_channel: "telegram_bot",
+    p_source_detail: "telegram-webhook",
+    p_segment: giftTrack ?? null,
+    p_comment: "Создано/обновлено из telegram-webhook",
+  });
+
+  const { data: contacts } = await client
+    .from("crm_contacts")
+    .select("id")
+    .eq("telegram_id", telegramId)
+    .limit(1);
+  const contactId = contacts?.[0]?.id as string | undefined;
+  if (!contactId) return;
+
+  await client.rpc("crm_add_interaction", {
+    p_contact_id: contactId,
+    p_channel: "telegram",
+    p_direction: "inbound",
+    p_interaction_type: "bot_start",
+    p_payload: {
+      text,
+      intent: intent ?? "unknown",
+      giftTrack: giftTrack ?? "default",
+      update,
+    },
+  });
+
+  if (intent === "diagnostic" || intent === "razbor" || intent === "present") {
+    await client.rpc("crm_change_stage", {
+      p_contact_id: contactId,
+      p_to_stage_code: "qualified",
+      p_changed_by: "bot",
+      p_reason: "start_command",
+      p_note: "Пользователь запустил сценарий в Telegram-боте",
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
@@ -215,6 +280,8 @@ Deno.serve(async (req) => {
   if (channelId) {
     await notifyChannel(token, channelId, intent, giftTrack, from);
   }
+
+  await saveCrmBotEvent(update, intent, giftTrack);
 
   return json({ ok: true, intent: intent ?? "unknown" }, 200);
 });

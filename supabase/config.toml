@@ -459,3 +459,15 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/telegram-webhook/deno.json"
 entrypoint = "./functions/telegram-webhook/index.ts"
+
+[functions.crm-lead-upsert]
+enabled = true
+verify_jwt = false
+import_map = "./functions/crm-lead-upsert/deno.json"
+entrypoint = "./functions/crm-lead-upsert/index.ts"
+
+[functions.crm-bot-event]
+enabled = true
+verify_jwt = false
+import_map = "./functions/crm-bot-event/deno.json"
+entrypoint = "./functions/crm-bot-event/index.ts"
