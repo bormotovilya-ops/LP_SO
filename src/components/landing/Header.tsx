@@ -17,7 +17,9 @@ export const Header = () => {
   const goCrm = () => {
     if (authLoading || profileLoading) return;
     if (!isSupabaseConfigured()) {
-      toast.error("CRM: не заданы VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY");
+      toast.error(
+        "CRM: нет ключа/URL. Локально — .env; GitHub Pages — Secrets (SUPABASE_URL, SUPABASE_ANON_KEY) и новый deploy.",
+      );
       return;
     }
     if (!user) {

@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL?.trim() ?? "";
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? "";
+// См. vite `define` __CRM_* (merge SUPABASE_*/VITE_*) — не полагаться на import.meta.env.VITE_*
+const url = (typeof __CRM_SUPABASE_URL__ !== "undefined" ? __CRM_SUPABASE_URL__ : "").trim();
+const anon = (typeof __CRM_SUPABASE_ANON_KEY__ !== "undefined" ? __CRM_SUPABASE_ANON_KEY__ : "").trim();
 
 if (import.meta.env.DEV && (!url || !anon)) {
   console.warn(

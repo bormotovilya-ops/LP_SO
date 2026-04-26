@@ -1,6 +1,9 @@
 const FALLBACK_FUNCTIONS_BASE_URL = "https://vvkjfaxlzlmeobgitxdj.supabase.co/functions/v1";
-const rawBase =
-  import.meta.env.VITE_SUPABASE_FUNCTIONS_BASE_URL?.trim() || FALLBACK_FUNCTIONS_BASE_URL;
+const rawBase = (() => {
+  const fromVite = typeof __CRM_FUNCTIONS_BASE_URL__ !== "undefined" ? __CRM_FUNCTIONS_BASE_URL__.trim() : "";
+  if (fromVite) return fromVite;
+  return import.meta.env.VITE_SUPABASE_FUNCTIONS_BASE_URL?.trim() || FALLBACK_FUNCTIONS_BASE_URL;
+})();
 
 function normalizeBase(base: string): string {
   return base.replace(/\/+$/, "");

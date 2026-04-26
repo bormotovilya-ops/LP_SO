@@ -28,8 +28,9 @@ export default function AdminLogin() {
     return (
       <div className="container-luxe flex min-h-screen flex-col items-center justify-center py-20">
         <p className="max-w-md text-center text-sm text-muted-foreground">
-          Укажите <code className="text-foreground">VITE_SUPABASE_URL</code> и{" "}
-          <code className="text-foreground">VITE_SUPABASE_ANON_KEY</code> в <code className="text-foreground">.env</code>.
+          Укажите в <code className="text-foreground">.env</code> (или в GitHub Actions Secrets){" "}
+          <code className="text-foreground">SUPABASE_URL</code> и <code className="text-foreground">SUPABASE_ANON_KEY</code> — значения
+          из Supabase → Settings → API. Затем снова <code className="text-foreground">npm run dev</code> или deploy.
         </p>
       </div>
     );

@@ -11,8 +11,10 @@ export function ProtectedCrmRoute({ children }: PropsWithChildren) {
     return (
       <div className="container-luxe flex min-h-[50vh] items-center justify-center py-20">
         <p className="max-w-md text-center text-sm text-muted-foreground">
-          CRM недоступна: в окружении не заданы <code className="text-foreground">VITE_SUPABASE_URL</code> и{" "}
-          <code className="text-foreground">VITE_SUPABASE_ANON_KEY</code>.
+          CRM: при сборке не подставлены <code className="text-foreground">SUPABASE_URL</code> /{" "}
+          <code className="text-foreground">SUPABASE_ANON_KEY</code> (GitHub → Actions secrets) либо локальный{" "}
+          <code className="text-foreground">.env</code>. После правки секретов — push в <code className="text-foreground">main</code>
+          (пересборка).
         </p>
       </div>
     );

@@ -170,7 +170,7 @@ Mini-CRM нужна для управления лидами без абонен
 
 1. Применить миграции (`01_apply_migrations.ps1`).
 2. Убедиться, что в `crm_pipeline_stages` появились этапы.
-3. **Edge Functions** (Supabase): системные `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` в рантайме; для CLI иногда `supabase secrets set`. **Веб-CRM на GitHub Pages:** публичные URL и **anon** берутся из **Supabase → Settings → API** и кладутся в **репозиторий GitHub → Settings → Secrets and variables → Actions** (именами `SUPABASE_URL`, `SUPABASE_ANON_KEY`, при необходимости `FUNCTIONS_BASE_URL` — как в дашборде, или `VITE_*` — см. `vite.config`). Vite на сборке мержет их в `import.meta.env.VITE_*`. **`SUPABASE_SERVICE_ROLE_KEY` в фронт не передавать.**
+3. **Edge Functions** (Supabase): системные `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` в рантайме; для CLI иногда `supabase secrets set`. **Веб-CRM на GitHub Pages:** публичные URL и **anon** из **Supabase → Settings → API** кладутся в **GitHub → репозиторий → Settings → Secrets and variables → Actions** (именами `SUPABASE_URL`, `SUPABASE_ANON_KEY`, опционально `FUNCTIONS_BASE_URL` или `VITE_*` — см. `vite.config` и workflow). Сборка подставляет их в клиент через `define` (`__CRM_*` в `vite.config`), без конфликта с плагином `import.meta.env`. После смены секретов — **перезапустить** workflow (push в `main`). **`SUPABASE_SERVICE_ROLE_KEY` в фронт не передавать.**
 4. Деплой edge-функций:
    - `npx supabase functions deploy crm-lead-upsert`
    - `npx supabase functions deploy crm-bot-event`

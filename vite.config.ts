@@ -30,10 +30,11 @@ export default defineConfig(({ mode }) => {
       mode === "development" || process.env.VERCEL || process.env.CUSTOM_DOMAIN_BUILD === "1"
         ? "/"
         : "/LP_SO/",
+    // Не класть в import.meta.env.VITE_* — плагин env перезаписывает, в Pages приходили пустые.
     define: {
-      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
-      "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabaseAnon),
-      "import.meta.env.VITE_SUPABASE_FUNCTIONS_BASE_URL": JSON.stringify(functionsBase),
+      __CRM_SUPABASE_URL__: JSON.stringify(supabaseUrl),
+      __CRM_SUPABASE_ANON_KEY__: JSON.stringify(supabaseAnon),
+      __CRM_FUNCTIONS_BASE_URL__: JSON.stringify(functionsBase),
     },
     server: {
       host: "::",
