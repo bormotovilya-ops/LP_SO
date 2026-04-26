@@ -66,8 +66,9 @@ export default defineConfig(({ mode }) => {
   const appVersion = readPackageVersion();
   const { supabaseUrl, supabaseAnon, functionsBase } = pickEnv(mode);
   if (process.env.CI === "true" && process.env.CUSTOM_DOMAIN_BUILD === "1" && (!supabaseUrl || !supabaseAnon)) {
-    throw new Error(
-      "CI: пустой SUPABASE в сборке. Добавь в GitHub: Settings → Secrets → Actions (вкладка «Repository») пары SUPABASE_URL и SUPABASE_ANON_KEY. Секреты только в Environment (без дублирования в Repository) job build НЕ видит. См. длины в шаге с Debug CRM.",
+    // Не throw — иначе при пустых секретах build падает и Pages не обновляется. В логе — предупреждение; в бандле CRM пустой, пока не заданы secrets.
+    console.error(
+      "[LP_SO] CI: пустой SUPABASE_URL / SUPABASE_ANON_KEY. Repository → Actions → secrets. CRM на сайте не заработает, пока не добавишь и не пересоберёшь.",
     );
   }
   return {

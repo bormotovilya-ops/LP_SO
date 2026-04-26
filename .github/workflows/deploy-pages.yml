@@ -9,6 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: "pages"
@@ -21,15 +22,8 @@ jobs:
     # Секреты для сборки: только **Repository** secrets (Settings ^→ Secrets and variables ^→ Actions, вкладка «Repository»).
     # Значения из Environment (только среда) сюда не попадут — дублируйте SUPABASE_URL / SUPABASE_ANON_KEY в Repository.
     steps:
-      - name: Where to find logs
-        run: |
-          echo "Run URL:    ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          echo "Job logs:  открой репо ^→ Actions ^→ последний 'Deploy to GitHub Pages' ^→ job build"
-          {
-            echo "## Deploy to GitHub Pages"
-            echo "Ссылка на **этот** запуск: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "Если build красный — раскрой шаг *Build project* и смотри ошибку (часто пустой CRM / npm)."
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Link to this workflow run
+        run: echo "Run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout
         uses: actions/checkout@v4
