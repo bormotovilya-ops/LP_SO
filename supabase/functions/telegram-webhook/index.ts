@@ -7,7 +7,7 @@ type StartIntent = "diagnostic" | "present" | "razbor";
 type GiftTrack = "fear" | "money" | "relations";
 type JsonObject = Record<string, unknown>;
 type StartPayload = { intent: StartIntent; giftTrack: GiftTrack | null };
-type GiftContent = { title: string; url: string };
+type GiftContent = { title: string; path: string };
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -79,19 +79,49 @@ function buildGiftContent(giftTrack: GiftTrack | null): GiftContent {
   if (giftTrack === "fear") {
     return {
       title: "Трансформация Стража: От Страха к Силе",
-      url: "https://disk.yandex.ru/d/MMAEowjLD_8nJQ",
+      path: "/materials/От Страха к Силе.ogg",
     };
   }
   if (giftTrack === "money") {
     return {
       title: "Финансовая емкость: от безопасности к масштабу",
-      url: "https://disk.yandex.ru/d/xn-xdigCFPDA8g",
+      path: "/materials/Финансовая емкость от безопасности к масштабу».ogg",
     };
   }
   return {
     title: "Внутренние Опоры: Возвращение Домой",
-    url: "https://disk.yandex.ru/d/TClegHhWrZr6qA",
+    path: "/materials/Внутренние Опоры Возвращение Домой.ogg",
   };
+}
+
+function normalizeSiteOrigin(raw: string): string {
+  const value = raw.trim().replace(/\/+$/, "");
+  if (!value) return "";
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  return `https://${value}`;
+}
+
+function getPublicSiteOrigin(): string {
+  const candidates = [
+    Deno.env.get("PUBLIC_SITE_URL") ?? "",
+    Deno.env.get("SITE_URL") ?? "",
+    Deno.env.get("VITE_SITE_URL") ?? "",
+  ];
+  for (const c of candidates) {
+    const normalized = normalizeSiteOrigin(c);
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
+function buildGiftPublicUrl(gift: GiftContent): string | null {
+  const origin = getPublicSiteOrigin();
+  if (!origin) return null;
+  const encodedPath = gift.path
+    .split("/")
+    .map((segment, index) => (index === 0 ? segment : encodeURIComponent(segment)))
+    .join("/");
+  return `${origin}${encodedPath}`;
 }
 
 function buildGiftIntroText(gift: GiftContent): string {
@@ -127,6 +157,46 @@ async function sendTelegram(token: string, method: string, payload: Record<strin
   } catch {
     return false;
   }
+}
+
+async function sendGiftPackage(token: string, chatId: number, giftTrack: GiftTrack | null): Promise<boolean> {
+  const gift = buildGiftContent(giftTrack);
+  const giftIntroText = buildGiftIntroText(gift);
+  const giftUrl = buildGiftPublicUrl(gift);
+
+  const introDelivered = await sendTelegram(token, "sendMessage", {
+    chat_id: chatId,
+    text: giftIntroText,
+    disable_web_page_preview: true,
+    protect_content: true,
+  });
+  if (!introDelivered) return false;
+
+  if (!giftUrl) {
+    return await sendTelegram(token, "sendMessage", {
+      chat_id: chatId,
+      text: "Файл пока недоступен автоматически. Напишите в поддержку, и мы сразу отправим подарок вручную.",
+      disable_web_page_preview: true,
+      protect_content: true,
+    });
+  }
+
+  const fileDelivered = await sendTelegram(token, "sendAudio", {
+    chat_id: chatId,
+    audio: giftUrl,
+    caption: `Медитация: «${gift.title}»`,
+    protect_content: true,
+  });
+  if (fileDelivered) return true;
+
+  // Некоторые облачные ссылки (в т.ч. Яндекс.Диск) Telegram не всегда принимает как document URL.
+  // Чтобы не провоцировать ретраи webhook, отправляем безопасный fallback и завершаем успешно.
+  return await sendTelegram(token, "sendMessage", {
+    chat_id: chatId,
+    text: `Файл не удалось прикрепить автоматически. Забрать подарок можно по ссылке:\n${giftUrl}`,
+    disable_web_page_preview: false,
+    protect_content: true,
+  });
 }
 
 async function notifyChannel(
@@ -267,6 +337,7 @@ Deno.serve(async (req) => {
     chat_id: chatId,
     text: greeting,
     disable_web_page_preview: true,
+    protect_content: intent === "present",
   });
 
   if (!firstDelivered) {
@@ -277,6 +348,7 @@ Deno.serve(async (req) => {
     chat_id: chatId,
     text: intentMessage,
     disable_web_page_preview: true,
+    protect_content: intent === "present",
   });
 
   if (!secondDelivered) {
@@ -284,25 +356,8 @@ Deno.serve(async (req) => {
   }
 
   if (intent === "present") {
-    const gift = buildGiftContent(giftTrack);
-    const giftIntroText = buildGiftIntroText(gift);
-    const giftDelivered = await sendTelegram(token, "sendMessage", {
-      chat_id: chatId,
-      text: giftIntroText,
-      disable_web_page_preview: true,
-      protect_content: true,
-    });
+    const giftDelivered = await sendGiftPackage(token, chatId, giftTrack);
     if (!giftDelivered) {
-      return json({ error: "Telegram delivery failed" }, 502);
-    }
-
-    const giftFileDelivered = await sendTelegram(token, "sendDocument", {
-      chat_id: chatId,
-      document: gift.url,
-      caption: `Медитация: «${gift.title}»`,
-      protect_content: true,
-    });
-    if (!giftFileDelivered) {
       return json({ error: "Telegram delivery failed" }, 502);
     }
   }
