@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { isSupabaseConfigured } from "@/lib/supabaseClient";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,38 @@ export default function AdminLogin() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [submitting, setSubmitting] = useState(false);
+  const [recoverySessionReady, setRecoverySessionReady] = useState(false);
+
+  useEffect(() => {
+    if (!inRecoveryFlow) {
+      setRecoverySessionReady(false);
+      return;
+    }
+
+    const establishRecoverySession = async () => {
+      try {
+        const rawHash = window.location.hash ?? "";
+        const parts = rawHash.split("#");
+        const tokenPart = parts.length > 2 ? parts[parts.length - 1] : "";
+        const tokenParams = new URLSearchParams(tokenPart);
+        const accessToken = tokenParams.get("access_token");
+        const refreshToken = tokenParams.get("refresh_token");
+        if (!accessToken || !refreshToken) {
+          setRecoverySessionReady(true);
+          return;
+        }
+        const supabase = getSupabase();
+        await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+      } finally {
+        setRecoverySessionReady(true);
+      }
+    };
+
+    void establishRecoverySession();
+  }, [inRecoveryFlow]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -130,6 +162,10 @@ export default function AdminLogin() {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!recoverySessionReady) {
+      toast.error("Сессия восстановления еще не готова. Повторите через секунду.");
+      return;
+    }
     if (newPassword.length < 6) {
       toast.error("Пароль должен быть не короче 6 символов");
       return;
@@ -160,6 +196,7 @@ export default function AdminLogin() {
           </div>
           {inRecoveryFlow ? (
             <form onSubmit={handleUpdatePassword} className="space-y-4">
+              {!recoverySessionReady ? <p className="text-xs text-muted-foreground">Подготавливаем сессию восстановления…</p> : null}
               <div className="space-y-2">
                 <Label htmlFor="new-pass">Новый пароль</Label>
                 <Input
@@ -184,7 +221,7 @@ export default function AdminLogin() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={submitting}>
+              <Button type="submit" className="w-full" disabled={submitting || !recoverySessionReady}>
                 {submitting ? "Сохраняем…" : "Сменить пароль"}
               </Button>
             </form>
