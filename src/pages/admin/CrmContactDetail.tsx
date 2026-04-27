@@ -19,6 +19,33 @@ import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
+type CrmInteractionRow = {
+  id: string;
+  channel: string;
+  direction: "inbound" | "outbound" | "internal";
+  interaction_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+type CrmStageHistoryRow = {
+  id: string;
+  reason: string;
+  note: string | null;
+  changed_by: "system" | "manager" | "bot";
+  created_at: string;
+  to_stage_id: string;
+  from_stage_id: string | null;
+};
+
+type TimelineEvent = {
+  id: string;
+  kind: "interaction" | "stage";
+  title: string;
+  meta: string;
+  createdAt: string;
+};
+
 function toInputDatetimeLocal(iso: string | null): string {
   if (!iso) return "";
   const d = parseISO(iso);
@@ -79,10 +106,64 @@ export default function CrmContactDetail() {
     },
   });
 
+  const { data: interactions = [] } = useQuery({
+    queryKey: ["crm", "interactions", id],
+    enabled: Boolean(id),
+    queryFn: async () => {
+      const { data, error: qe } = await supabase
+        .from("crm_interactions")
+        .select("id, channel, direction, interaction_type, payload, created_at")
+        .eq("contact_id", id!)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (qe) throw qe;
+      return (data ?? []) as CrmInteractionRow[];
+    },
+  });
+
+  const { data: stageHistory = [] } = useQuery({
+    queryKey: ["crm", "stage-history", id],
+    enabled: Boolean(id),
+    queryFn: async () => {
+      const { data, error: qe } = await supabase
+        .from("crm_contact_stage_history")
+        .select("id, reason, note, changed_by, created_at, to_stage_id, from_stage_id")
+        .eq("contact_id", id!)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (qe) throw qe;
+      return (data ?? []) as CrmStageHistoryRow[];
+    },
+  });
+
   const currentStageCode = useMemo(() => {
     if (!contact?.current_stage_id || !stages) return "";
     return stages.find((s) => s.id === contact.current_stage_id)?.code ?? "";
   }, [contact, stages]);
+
+  const stageNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of stages ?? []) map.set(s.id, s.name);
+    return map;
+  }, [stages]);
+
+  const timeline = useMemo<TimelineEvent[]>(() => {
+    const fromInteractions: TimelineEvent[] = interactions.map((item) => ({
+      id: `interaction-${item.id}`,
+      kind: "interaction",
+      title: `Событие: ${item.interaction_type}`,
+      meta: `${item.channel} · ${item.direction}`,
+      createdAt: item.created_at,
+    }));
+    const fromStages: TimelineEvent[] = stageHistory.map((item) => ({
+      id: `stage-${item.id}`,
+      kind: "stage",
+      title: `Этап: ${stageNameById.get(item.to_stage_id) ?? "Неизвестный этап"}`,
+      meta: `${item.changed_by} · ${item.reason}${item.note ? ` · ${item.note}` : ""}`,
+      createdAt: item.created_at,
+    }));
+    return [...fromInteractions, ...fromStages].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }, [interactions, stageHistory, stageNameById]);
 
   const [stageCode, setStageCode] = useState("");
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -179,6 +260,9 @@ export default function CrmContactDetail() {
         <h1 className="mt-2 font-display text-3xl text-foreground">{contact.full_name || "Без имени"}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Создан: {format(parseISO(contact.created_at), "d MMM yyyy, HH:mm", { locale: ru })}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Источник: {contact.source_channel || "—"} {contact.telegram_id ? `· Telegram ID: ${contact.telegram_id}` : ""}
         </p>
       </div>
 
@@ -282,6 +366,25 @@ export default function CrmContactDetail() {
           <Button type="button" onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
             {saving ? "Сохранение…" : "Сохранить"}
           </Button>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="font-display text-xl text-foreground">История активности</h2>
+        {timeline.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Пока нет событий по этому лиду.</p>
+        ) : (
+          <div className="space-y-2">
+            {timeline.map((event) => (
+              <div key={event.id} className="rounded-sm border border-hairline bg-surface/20 px-3 py-2">
+                <p className="text-sm text-foreground">{event.title}</p>
+                <p className="text-xs text-muted-foreground">{event.meta}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {format(parseISO(event.createdAt), "d MMM yyyy, HH:mm", { locale: ru })}
+                </p>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

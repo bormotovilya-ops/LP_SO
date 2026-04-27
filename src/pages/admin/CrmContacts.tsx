@@ -103,7 +103,7 @@ export default function CrmContacts() {
                     to={`/admin/crm/contacts/${c.id}`}
                     className="font-medium text-accent underline-offset-2 hover:underline"
                   >
-                    {c.full_name || "—"}
+                    {c.full_name || `Клиент ${c.id.slice(0, 8)}`}
                   </Link>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{c.phone || "—"}</TableCell>

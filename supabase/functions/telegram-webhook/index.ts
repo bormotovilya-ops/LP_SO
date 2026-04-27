@@ -7,6 +7,7 @@ type StartIntent = "diagnostic" | "present" | "razbor";
 type GiftTrack = "fear" | "money" | "relations";
 type JsonObject = Record<string, unknown>;
 type StartPayload = { intent: StartIntent; giftTrack: GiftTrack | null };
+type GiftContent = { title: string; url: string };
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -74,17 +75,33 @@ function buildWelcomeText(intent: StartIntent | null, firstName: string): string
   return `${namePart}добро пожаловать! 👋\n\nМы получили вашу заявку с сайта. Чтобы не потерять связь, оставайтесь в этом боте — сюда придут следующие шаги.`;
 }
 
-function buildGiftStubText(giftTrack: GiftTrack | null): string {
+function buildGiftContent(giftTrack: GiftTrack | null): GiftContent {
   if (giftTrack === "fear") {
-    return "Подарок 1/3 (заглушка): файл «Первый шаг из страха.pdf». Скоро заменим на финальный материал.";
+    return {
+      title: "Трансформация Стража: От Страха к Силе",
+      url: "https://disk.yandex.ru/d/MMAEowjLD_8nJQ",
+    };
   }
   if (giftTrack === "money") {
-    return "Подарок 2/3 (заглушка): файл «Денежные утечки.pdf». Скоро заменим на финальный материал.";
+    return {
+      title: "Финансовая емкость: от безопасности к масштабу",
+      url: "https://disk.yandex.ru/d/xn-xdigCFPDA8g",
+    };
   }
-  if (giftTrack === "relations") {
-    return "Подарок 3/3 (заглушка): файл «Честный разговор.pdf». Скоро заменим на финальный материал.";
-  }
-  return "Подарок (заглушка): файл «Твой подарок.pdf». Скоро заменим на финальный материал.";
+  return {
+    title: "Внутренние Опоры: Возвращение Домой",
+    url: "https://disk.yandex.ru/d/TClegHhWrZr6qA",
+  };
+}
+
+function buildGiftIntroText(gift: GiftContent): string {
+  return [
+    "Мини-расстановка медитация в подарок 🎁",
+    "",
+    `«${gift.title}»`,
+    "",
+    "Приятного прослушивания ❤️",
+  ].join("\n");
 }
 
 function buildUnifiedGreeting(firstName: string): string {
@@ -267,12 +284,25 @@ Deno.serve(async (req) => {
   }
 
   if (intent === "present") {
+    const gift = buildGiftContent(giftTrack);
+    const giftIntroText = buildGiftIntroText(gift);
     const giftDelivered = await sendTelegram(token, "sendMessage", {
       chat_id: chatId,
-      text: buildGiftStubText(giftTrack),
+      text: giftIntroText,
       disable_web_page_preview: true,
+      protect_content: true,
     });
     if (!giftDelivered) {
+      return json({ error: "Telegram delivery failed" }, 502);
+    }
+
+    const giftFileDelivered = await sendTelegram(token, "sendDocument", {
+      chat_id: chatId,
+      document: gift.url,
+      caption: `Медитация: «${gift.title}»`,
+      protect_content: true,
+    });
+    if (!giftFileDelivered) {
       return json({ error: "Telegram delivery failed" }, 502);
     }
   }
