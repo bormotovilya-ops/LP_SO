@@ -16,6 +16,9 @@ type AuthContextValue = AuthState & {
   canWriteCrm: boolean;
   canEditSite: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUpWithEmailLink: (email: string) => Promise<{ error: Error | null }>;
+  resetPasswordForEmail: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -97,6 +100,55 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return { error: error as Error | null };
   }, []);
 
+  const signUpWithEmailLink = useCallback(async (email: string) => {
+    if (!isSupabaseConfigured()) {
+      return {
+        error: new Error(
+          "CRM: не настроен Supabase. Локально — в корне .env укажите SUPABASE_URL и SUPABASE_ANON_KEY (или VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY). На GitHub Pages — repository secrets с теми же именами и новый deploy.",
+        ),
+      };
+    }
+    const supabase = getSupabase();
+    const redirectTo = `${window.location.origin}${window.location.pathname}#/admin/login`;
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: redirectTo,
+      },
+    });
+    return { error: error as Error | null };
+  }, []);
+
+  const resetPasswordForEmail = useCallback(async (email: string) => {
+    if (!isSupabaseConfigured()) {
+      return {
+        error: new Error(
+          "CRM: не настроен Supabase. Локально — в корне .env укажите SUPABASE_URL и SUPABASE_ANON_KEY (или VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY). На GitHub Pages — repository secrets с теми же именами и новый deploy.",
+        ),
+      };
+    }
+    const supabase = getSupabase();
+    const redirectTo = `${window.location.origin}${window.location.pathname}#/admin/login`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
+    });
+    return { error: error as Error | null };
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    if (!isSupabaseConfigured()) {
+      return {
+        error: new Error(
+          "CRM: не настроен Supabase. Локально — в корне .env укажите SUPABASE_URL и SUPABASE_ANON_KEY (или VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY). На GitHub Pages — repository secrets с теми же именами и новый deploy.",
+        ),
+      };
+    }
+    const supabase = getSupabase();
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error as Error | null };
+  }, []);
+
   const signOut = useCallback(async () => {
     if (!isSupabaseConfigured()) return;
     const supabase = getSupabase();
@@ -120,10 +172,25 @@ export function AuthProvider({ children }: PropsWithChildren) {
       canWriteCrm: Boolean(profile?.is_active && canWriteRole(r)),
       canEditSite: Boolean(profile?.is_active && canWriteRole(r)),
       signIn,
+      signUpWithEmailLink,
+      resetPasswordForEmail,
+      updatePassword,
       signOut,
       refreshProfile,
     };
-  }, [session, user, profile, loading, profileLoading, signIn, signOut, refreshProfile]);
+  }, [
+    session,
+    user,
+    profile,
+    loading,
+    profileLoading,
+    signIn,
+    signUpWithEmailLink,
+    resetPasswordForEmail,
+    updatePassword,
+    signOut,
+    refreshProfile,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
