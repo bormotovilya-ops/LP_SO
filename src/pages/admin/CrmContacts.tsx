@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getSupabase } from "@/lib/supabaseClient";
@@ -9,6 +9,7 @@ import { ru } from "date-fns/locale";
 
 export default function CrmContacts() {
   const supabase = getSupabase();
+  const [mode, setMode] = useState<"all" | "bot">("all");
 
   const { data: stages, isLoading: sLoading, error: sErr } = useQuery({
     queryKey: ["crm", "pipeline-stages"],
@@ -27,7 +28,7 @@ export default function CrmContacts() {
     queryFn: async () => {
       const { data, error: qErr } = await supabase
         .from("crm_contacts")
-        .select("id, full_name, phone, email, source_channel, current_stage_id, last_activity_at, created_at")
+        .select("id, full_name, phone, email, telegram_id, source_channel, current_stage_id, last_activity_at, created_at")
         .order("last_activity_at", { ascending: false, nullsFirst: false });
       if (qErr) throw qErr;
       return (data ?? []) as CrmContactRow[];
@@ -39,6 +40,13 @@ export default function CrmContacts() {
     for (const s of stages ?? []) m.set(s.id, s.name);
     return m;
   }, [stages]);
+
+  const allContacts = contacts ?? [];
+  const botContacts = useMemo(
+    () => allContacts.filter((c) => c.source_channel === "telegram_bot" || Boolean(c.telegram_id)),
+    [allContacts],
+  );
+  const visibleContacts = mode === "bot" ? botContacts : allContacts;
 
   if (sLoading || isLoading) {
     return <p className="text-sm text-muted-foreground">Загрузка…</p>;
@@ -53,6 +61,26 @@ export default function CrmContacts() {
       <div>
         <h1 className="font-display text-3xl text-foreground">Контакты</h1>
         <p className="mt-1 text-sm text-muted-foreground">Список лидов, сортировка по последней активности</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("all")}
+            className={`rounded-sm border px-3 py-1.5 text-xs ${
+              mode === "all" ? "border-accent text-accent" : "border-hairline text-muted-foreground"
+            }`}
+          >
+            Все лиды ({allContacts.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("bot")}
+            className={`rounded-sm border px-3 py-1.5 text-xs ${
+              mode === "bot" ? "border-accent text-accent" : "border-hairline text-muted-foreground"
+            }`}
+          >
+            Пользователи бота ({botContacts.length})
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-sm border border-hairline">
@@ -68,7 +96,7 @@ export default function CrmContacts() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(contacts ?? []).map((c) => (
+            {visibleContacts.map((c) => (
               <TableRow key={c.id}>
                 <TableCell>
                   <Link
@@ -91,10 +119,10 @@ export default function CrmContacts() {
                 </TableCell>
               </TableRow>
             ))}
-            {(contacts ?? []).length === 0 ? (
+            {visibleContacts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  Пока нет лидов
+                  {mode === "bot" ? "Пока нет пользователей бота" : "Пока нет лидов"}
                 </TableCell>
               </TableRow>
             ) : null}

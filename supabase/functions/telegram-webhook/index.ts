@@ -193,9 +193,10 @@ async function saveCrmBotEvent(
   });
 
   if (intent === "diagnostic" || intent === "razbor" || intent === "present") {
+    const targetStageCode = intent === "present" ? "gift_received" : "bot_started";
     await client.rpc("crm_change_stage", {
       p_contact_id: contactId,
-      p_to_stage_code: "qualified",
+      p_to_stage_code: targetStageCode,
       p_changed_by: "bot",
       p_reason: "start_command",
       p_note: "Пользователь запустил сценарий в Telegram-боте",

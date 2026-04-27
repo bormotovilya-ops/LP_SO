@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from "@supabase/supabase-js";
 
 const TG_API = "https://api.telegram.org";
 const MAX_FIELD = 4000;
@@ -30,6 +31,18 @@ function sliceTelegramChunks(html: string, maxLen: number): string[] {
   return chunks;
 }
 
+function normalizePhone(raw: string): string {
+  const cleaned = raw.replace(/[^\d+]/g, "").trim();
+  return cleaned || raw.trim();
+}
+
+function pickStageCode(eventType: string): string {
+  if (eventType === "quiz_completed") return "quiz_completed";
+  if (eventType === "gift_received") return "gift_received";
+  if (eventType === "bot_started") return "bot_started";
+  return "diagnostic_requested";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -57,6 +70,12 @@ Deno.serve(async (req) => {
   const messenger = String(body.messenger ?? "").trim().slice(0, MAX_FIELD);
   const goal = String(body.goal ?? "").trim().slice(0, MAX_FIELD);
   const message = String(body.message ?? "").trim().slice(0, MAX_FIELD);
+  const crmEventType = String(body.crmEventType ?? "diagnostic_request_submitted")
+    .trim()
+    .toLowerCase()
+    .slice(0, 80);
+  const quizNumber = body.quizNumber;
+  const giftTrack = String(body.giftTrack ?? "").trim().slice(0, 40);
 
   if (!name || !contact) {
     return json({ error: "Invalid payload" }, 400);
@@ -99,6 +118,66 @@ Deno.serve(async (req) => {
 
     if (!tgJson.ok) {
       return json({ error: "Delivery failed" }, 502);
+    }
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (supabaseUrl && serviceRole) {
+    try {
+      const supabase = createClient(supabaseUrl, serviceRole, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      const normalizedContact = normalizePhone(contact);
+      const telegramMatch = messenger.match(/@([a-zA-Z0-9_]{3,})/);
+      const telegramHandle = telegramMatch ? `@${telegramMatch[1]}` : messenger || null;
+
+      const { data: resolvedContact } = await supabase.rpc("crm_upsert_contact", {
+        p_full_name: name || null,
+        p_phone: normalizedContact || null,
+        p_email: null,
+        p_telegram_id: null,
+        p_source_channel: "site_form",
+        p_source_detail: crmEventType || "diagnostic_request_submitted",
+        p_utm_source: null,
+        p_utm_medium: null,
+        p_utm_campaign: null,
+        p_utm_content: null,
+        p_utm_term: null,
+        p_segment: giftTrack || null,
+        p_owner_user_id: null,
+        p_consent_personal_data: true,
+        p_comment: null,
+      });
+
+      const contactId = (resolvedContact as { id?: string } | null)?.id;
+      if (contactId) {
+        await supabase.rpc("crm_add_interaction", {
+          p_contact_id: contactId,
+          p_channel: "site_form",
+          p_direction: "inbound",
+          p_interaction_type: crmEventType || "diagnostic_request_submitted",
+          p_payload: {
+            goal: goal || null,
+            message: message || null,
+            messenger: messenger || null,
+            telegram_handle: telegramHandle,
+            quiz_number: typeof quizNumber === "number" ? quizNumber : null,
+            gift_track: giftTrack || null,
+          },
+        });
+
+        await supabase.rpc("crm_change_stage", {
+          p_contact_id: contactId,
+          p_to_stage_code: pickStageCode(crmEventType),
+          p_changed_by: "system",
+          p_reason: "site_event",
+          p_note: "Автоматический этап по событию из формы сайта",
+        });
+      }
+    } catch (error) {
+      console.error("[contact] CRM sync failed:", error);
     }
   }
 

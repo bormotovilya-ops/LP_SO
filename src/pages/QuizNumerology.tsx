@@ -247,6 +247,9 @@ const QuizNumerology = () => {
           messenger: telegram,
           goal: "Запись на консультацию после квиза",
           message,
+          crmEventType: "quiz_completed",
+          quizNumber,
+          giftTrack: focus ?? null,
         }),
       });
 

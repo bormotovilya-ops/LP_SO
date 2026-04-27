@@ -29,6 +29,7 @@ export const Contact = () => {
           messenger,
           goal,
           message,
+          crmEventType: "diagnostic_request_submitted",
         }),
       });
 
