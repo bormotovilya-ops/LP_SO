@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabaseClient";
@@ -30,12 +30,19 @@ export default function AdminLogin() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [submitting, setSubmitting] = useState(false);
   const [recoverySessionReady, setRecoverySessionReady] = useState(false);
+  const passwordFlowSessionInitRef = useRef(false);
 
   useEffect(() => {
     if (!inPasswordSetupFlow) {
       setRecoverySessionReady(false);
+      passwordFlowSessionInitRef.current = false;
       return;
     }
+    if (passwordFlowSessionInitRef.current) {
+      setRecoverySessionReady(true);
+      return;
+    }
+    passwordFlowSessionInitRef.current = true;
 
     const establishRecoverySession = async () => {
       try {
@@ -45,15 +52,27 @@ export default function AdminLogin() {
         const tokenParams = new URLSearchParams(tokenPart);
         const accessToken = tokenParams.get("access_token");
         const refreshToken = tokenParams.get("refresh_token");
+        const supabase = getSupabase();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session) {
+          setRecoverySessionReady(true);
+          return;
+        }
         if (!accessToken || !refreshToken) {
           setRecoverySessionReady(true);
           return;
         }
-        const supabase = getSupabase();
         await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
         });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error ?? "");
+        if (!/lock|AbortError/i.test(message)) {
+          toast.error("Не удалось инициализировать сессию восстановления. Откройте ссылку из письма повторно.");
+        }
       } finally {
         setRecoverySessionReady(true);
       }
