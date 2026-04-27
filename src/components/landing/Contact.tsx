@@ -20,6 +20,32 @@ export const Contact = () => {
     const message = String(formData.get("message") ?? "").trim();
 
     try {
+      const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: name,
+          phone: contact,
+          sourceChannel: "site_form",
+          sourceDetail: "diagnostic_request",
+          segment: "diagnostic",
+          consentPersonalData: true,
+          interaction: {
+            channel: "site_form",
+            direction: "inbound",
+            type: "diagnostic_request_submitted",
+            payload: {
+              goal: goal || null,
+              messenger: messenger || null,
+              message: message || null,
+            },
+          },
+        }),
+      });
+      if (!crmRes.ok) {
+        throw new Error(`CRM upsert failed: ${crmRes.status}`);
+      }
+
       const res = await fetch(functionsApiUrl("/contact"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -41,19 +67,22 @@ export const Contact = () => {
       }
 
       if (!res.ok || data.ok !== true) {
-        throw new Error(`HTTP ${res.status}`);
+        toast({
+          title: "Лид сохранен в CRM",
+          description: "Заявка в Telegram временно не отправлена. Проверьте канал вручную.",
+        });
+      } else {
+        toast({
+          title: "Заявка отправлена",
+          description: "Мы свяжемся с вами по указанным контактам.",
+        });
+        toast({
+          title: "Откроем Telegram-бота",
+          description: "После открытия бота обязательно нажмите Start, чтобы завершить заявку.",
+        });
+        window.open(buildTelegramBotUrl("diagnostic"), "_blank", "noopener,noreferrer");
       }
-
       form.reset();
-      toast({
-        title: "Заявка отправлена",
-        description: "Мы свяжемся с вами по указанным контактам.",
-      });
-      toast({
-        title: "Откроем Telegram-бота",
-        description: "После открытия бота обязательно нажмите Start, чтобы завершить заявку.",
-      });
-      window.open(buildTelegramBotUrl("diagnostic"), "_blank", "noopener,noreferrer");
     } catch {
       toast({
         title: "Не удалось отправить",

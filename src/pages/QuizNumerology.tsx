@@ -225,6 +225,35 @@ const QuizNumerology = () => {
 
     setSending(true);
     try {
+      const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: name,
+          phone,
+          sourceChannel: "quiz_form",
+          sourceDetail: "quiz_review_request",
+          segment: focus ?? null,
+          consentPersonalData: true,
+          interaction: {
+            channel: "quiz_form",
+            direction: "inbound",
+            type: "quiz_review_requested",
+            payload: {
+              quiz_number: quizNumber ?? null,
+              focus: focus ?? null,
+              situation: situation ?? null,
+              telegram: telegram || null,
+              income: income || null,
+              financial_goal: financialGoal || null,
+              invest_ready: investReady || null,
+              year_consequence: yearConsequence || null,
+            },
+          },
+        }),
+      });
+      if (!crmRes.ok) throw new Error("crm-upsert-failed");
+
       const message = [
         "Анкета после квиза",
         `Тема подарка: ${focus ?? "—"}`,
@@ -254,17 +283,22 @@ const QuizNumerology = () => {
       });
 
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
-      if (!res.ok || data.ok !== true) throw new Error("send failed");
-
-      toast({
-        title: "Анкета отправлена",
-        description: "Спасибо! Светлана свяжется с вами по указанным контактам.",
-      });
-      toast({
-        title: "Откроем Telegram-бота",
-        description: "После открытия бота обязательно нажмите Start, чтобы заявка закрепилась.",
-      });
-      window.open(buildTelegramBotUrl("razbor"), "_blank", "noopener,noreferrer");
+      if (!res.ok || data.ok !== true) {
+        toast({
+          title: "Анкета сохранена в CRM",
+          description: "Заявка в Telegram временно не отправлена.",
+        });
+      } else {
+        toast({
+          title: "Анкета отправлена",
+          description: "Спасибо! Светлана свяжется с вами по указанным контактам.",
+        });
+        toast({
+          title: "Откроем Telegram-бота",
+          description: "После открытия бота обязательно нажмите Start, чтобы заявка закрепилась.",
+        });
+        window.open(buildTelegramBotUrl("razbor"), "_blank", "noopener,noreferrer");
+      }
       setName("");
       setPhone("");
       setTelegram("");
