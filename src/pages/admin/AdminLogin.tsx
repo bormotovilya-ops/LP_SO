@@ -14,7 +14,11 @@ export default function AdminLogin() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? "/admin/crm";
+  const authTypeMatch = location.hash.match(/(^|[&#?])type=([^&#]+)/i);
+  const authLinkType = authTypeMatch?.[2]?.toLowerCase() ?? "";
   const inRecoveryFlow = /(^|[&#?])type=recovery([&#]|$)/i.test(location.hash);
+  const inSignupFlow = authLinkType === "signup" || authLinkType === "magiclink";
+  const inPasswordSetupFlow = inRecoveryFlow || inSignupFlow;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +32,7 @@ export default function AdminLogin() {
   const [recoverySessionReady, setRecoverySessionReady] = useState(false);
 
   useEffect(() => {
-    if (!inRecoveryFlow) {
+    if (!inPasswordSetupFlow) {
       setRecoverySessionReady(false);
       return;
     }
@@ -56,15 +60,15 @@ export default function AdminLogin() {
     };
 
     void establishRecoverySession();
-  }, [inRecoveryFlow]);
+  }, [inPasswordSetupFlow]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
-    if (inRecoveryFlow) return;
+    if (inPasswordSetupFlow) return;
     if (!loading && !profileLoading && user && isStaff) {
       navigate(from, { replace: true });
     }
-  }, [loading, profileLoading, user, isStaff, from, navigate, inRecoveryFlow]);
+  }, [loading, profileLoading, user, isStaff, from, navigate, inPasswordSetupFlow]);
 
   if (!isSupabaseConfigured()) {
     return (
@@ -128,6 +132,10 @@ export default function AdminLogin() {
     const { error } = await signIn(email, password);
     setSubmitting(false);
     if (error) {
+      if (/invalid login credentials/i.test(error.message)) {
+        toast.error("Неверный email или пароль. Если регистрировались по ссылке, сначала задайте пароль через «Забыли пароль?»");
+        return;
+      }
       toast.error(error.message || "Ошибка входа");
       return;
     }
@@ -192,9 +200,9 @@ export default function AdminLogin() {
         <div className="w-full max-w-sm space-y-8 rounded-sm border border-hairline bg-surface/30 p-8 shadow-sm">
           <div className="text-center">
             <h1 className="font-display text-2xl text-foreground">CRM</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{inRecoveryFlow ? "Смена пароля" : "Авторизация команды"}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{inPasswordSetupFlow ? "Задайте пароль" : "Авторизация команды"}</p>
           </div>
-          {inRecoveryFlow ? (
+          {inPasswordSetupFlow ? (
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               {!recoverySessionReady ? <p className="text-xs text-muted-foreground">Подготавливаем сессию восстановления…</p> : null}
               <div className="space-y-2">
@@ -222,7 +230,7 @@ export default function AdminLogin() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={submitting || !recoverySessionReady}>
-                {submitting ? "Сохраняем…" : "Сменить пароль"}
+                {submitting ? "Сохраняем…" : "Сохранить пароль"}
               </Button>
             </form>
           ) : (
