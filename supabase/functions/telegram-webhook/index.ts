@@ -7,7 +7,7 @@ type StartIntent = "diagnostic" | "present" | "razbor";
 type GiftTrack = "fear" | "money" | "relations";
 type JsonObject = Record<string, unknown>;
 type StartPayload = { intent: StartIntent; giftTrack: GiftTrack | null };
-type GiftContent = { title: string; path: string };
+type GiftContent = { title: string };
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -79,49 +79,52 @@ function buildGiftContent(giftTrack: GiftTrack | null): GiftContent {
   if (giftTrack === "fear") {
     return {
       title: "Трансформация Стража: От Страха к Силе",
-      path: "/materials/От Страха к Силе.ogg",
     };
   }
   if (giftTrack === "money") {
     return {
       title: "Финансовая емкость: от безопасности к масштабу",
-      path: "/materials/Финансовая емкость от безопасности к масштабу».ogg",
     };
   }
   return {
     title: "Внутренние Опоры: Возвращение Домой",
-    path: "/materials/Внутренние Опоры Возвращение Домой.ogg",
   };
 }
 
-function normalizeSiteOrigin(raw: string): string {
-  const value = raw.trim().replace(/\/+$/, "");
-  if (!value) return "";
-  if (value.startsWith("http://") || value.startsWith("https://")) return value;
-  return `https://${value}`;
-}
+/**
+ * Канал с постами-подарками: `t.me/c/3917093952/…` → API id `-1003917093952`.
+ * Бот должен быть в канале (обычно админ), иначе copyMessage не сработает.
+ */
+const DEFAULT_GIFT_FROM_CHAT_ID = "-1003917093952";
 
-function getPublicSiteOrigin(): string {
-  const candidates = [
-    Deno.env.get("PUBLIC_SITE_URL") ?? "",
-    Deno.env.get("SITE_URL") ?? "",
-    Deno.env.get("VITE_SITE_URL") ?? "",
-  ];
-  for (const c of candidates) {
-    const normalized = normalizeSiteOrigin(c);
-    if (normalized) return normalized;
-  }
-  return "";
-}
+const DEFAULT_GIFT_MESSAGE_IDS: Record<GiftTrack, number> = {
+  fear: 50,
+  money: 51,
+  relations: 52,
+};
 
-function buildGiftPublicUrl(gift: GiftContent): string | null {
-  const origin = getPublicSiteOrigin();
-  if (!origin) return null;
-  const encodedPath = gift.path
-    .split("/")
-    .map((segment, index) => (index === 0 ? segment : encodeURIComponent(segment)))
-    .join("/");
-  return `${origin}${encodedPath}`;
+function resolveGiftCopySource(giftTrack: GiftTrack | null): { from_chat_id: string; message_id: number } | null {
+  const trackKey: GiftTrack = giftTrack === "fear" || giftTrack === "money" ? giftTrack : "relations";
+  const fromRaw =
+    Deno.env.get("TELEGRAM_GIFT_FROM_CHAT_ID")?.trim() ??
+    Deno.env.get("TELEGRAM_GIFTS_FROM_CHAT_ID")?.trim() ??
+    DEFAULT_GIFT_FROM_CHAT_ID;
+
+  if (!/^-100\d+$/.test(fromRaw) && !/^-\d+$/.test(fromRaw)) return null;
+
+  const idEnvKey =
+    trackKey === "fear"
+      ? "TELEGRAM_GIFT_MESSAGE_ID_FEAR"
+      : trackKey === "money"
+        ? "TELEGRAM_GIFT_MESSAGE_ID_MONEY"
+        : "TELEGRAM_GIFT_MESSAGE_ID_RELATIONS";
+  const midRaw = Deno.env.get(idEnvKey)?.trim();
+  const message_id =
+    midRaw && /^\d+$/.test(midRaw) ? Number.parseInt(midRaw, 10) : DEFAULT_GIFT_MESSAGE_IDS[trackKey];
+
+  if (!Number.isFinite(message_id) || message_id < 1) return null;
+
+  return { from_chat_id: fromRaw, message_id };
 }
 
 function buildGiftIntroText(gift: GiftContent): string {
@@ -162,7 +165,7 @@ async function sendTelegram(token: string, method: string, payload: Record<strin
 async function sendGiftPackage(token: string, chatId: number, giftTrack: GiftTrack | null): Promise<boolean> {
   const gift = buildGiftContent(giftTrack);
   const giftIntroText = buildGiftIntroText(gift);
-  const giftUrl = buildGiftPublicUrl(gift);
+  const copySource = resolveGiftCopySource(giftTrack);
 
   const introDelivered = await sendTelegram(token, "sendMessage", {
     chat_id: chatId,
@@ -172,29 +175,29 @@ async function sendGiftPackage(token: string, chatId: number, giftTrack: GiftTra
   });
   if (!introDelivered) return false;
 
-  if (!giftUrl) {
+  if (!copySource) {
     return await sendTelegram(token, "sendMessage", {
       chat_id: chatId,
-      text: "Файл пока недоступен автоматически. Напишите в поддержку, и мы сразу отправим подарок вручную.",
+      text: "Подарок пока не настроен на сервере. Напишите в поддержку — пришлём файл вручную.",
       disable_web_page_preview: true,
       protect_content: true,
     });
   }
 
-  const fileDelivered = await sendTelegram(token, "sendAudio", {
+  const copied = await sendTelegram(token, "copyMessage", {
     chat_id: chatId,
-    audio: giftUrl,
-    caption: `Медитация: «${gift.title}»`,
+    from_chat_id: copySource.from_chat_id,
+    message_id: copySource.message_id,
     protect_content: true,
   });
-  if (fileDelivered) return true;
 
-  // Некоторые облачные ссылки (в т.ч. Яндекс.Диск) Telegram не всегда принимает как document URL.
-  // Чтобы не провоцировать ретраи webhook, отправляем безопасный fallback и завершаем успешно.
+  if (copied) return true;
+
   return await sendTelegram(token, "sendMessage", {
     chat_id: chatId,
-    text: `Файл не удалось прикрепить автоматически. Забрать подарок можно по ссылке:\n${giftUrl}`,
-    disable_web_page_preview: false,
+    text:
+      "Не удалось доставить файл автоматически. Проверьте, что бот — администратор канала с подарками, и что TELEGRAM_GIFT_FROM_CHAT_ID совпадает с id канала. Напишите в поддержку — мы отправим подарок вручную.",
+    disable_web_page_preview: true,
     protect_content: true,
   });
 }
