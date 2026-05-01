@@ -87,7 +87,12 @@ export default function CrmContactDetail() {
   const queryClient = useQueryClient();
   const readOnly = !canWriteCrm;
 
-  const { data: stages } = useQuery({
+  const {
+    data: stages,
+    isLoading: stagesLoading,
+    isError: stagesIsError,
+    error: stagesQueryError,
+  } = useQuery({
     queryKey: ["crm", "pipeline-stages"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -163,9 +168,10 @@ export default function CrmContactDetail() {
   );
 
   const currentStageCode = useMemo(() => {
-    if (!contact?.current_stage_id || !stages) return "";
-    return stages.find((s) => s.id === contact.current_stage_id)?.code ?? "";
-  }, [contact, stages]);
+    if (!contact?.current_stage_id) return "";
+    const list = stages ?? [];
+    return list.find((s) => s.id === contact.current_stage_id)?.code ?? "";
+  }, [contact?.current_stage_id, stages]);
 
   const stageNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -174,9 +180,13 @@ export default function CrmContactDetail() {
   }, [stages]);
 
   const currentStageDisplayName = useMemo(() => {
-    if (!contact.current_stage_id) return null;
+    if (!contact?.current_stage_id) return null;
     return stageNameById.get(contact.current_stage_id) ?? null;
-  }, [contact.current_stage_id, stageNameById]);
+  }, [contact?.current_stage_id, stageNameById]);
+
+  /** Radix Select не допускает value="" и требует совпадения с SelectItem. */
+  const stageCodes = useMemo(() => new Set((stages ?? []).map((s) => s.code)), [stages]);
+  const funnelSelectValue = stageCode && stageCodes.has(stageCode) ? stageCode : "__crm_stage_unresolved__";
 
   const [stageCode, setStageCode] = useState("");
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -340,12 +350,20 @@ export default function CrmContactDetail() {
     return <p className="text-sm text-destructive">Некорректный URL</p>;
   }
 
-  if (isLoading) {
+  if (isLoading || stagesLoading) {
     return <p className="text-sm text-muted-foreground">Загрузка…</p>;
   }
 
   if (error) {
     return <p className="text-sm text-destructive">{(error as Error).message}</p>;
+  }
+
+  if (stagesIsError) {
+    return (
+      <p className="text-sm text-destructive">
+        Этапы воронки: {(stagesQueryError as Error)?.message ?? "ошибка загрузки"}
+      </p>
+    );
   }
 
   if (!contact) {
@@ -424,11 +442,21 @@ export default function CrmContactDetail() {
 
         <div className="space-y-2">
           <Label>Этап воронки</Label>
-          <Select value={stageCode} onValueChange={setStageCode} disabled={readOnly}>
+          <Select
+            value={funnelSelectValue}
+            onValueChange={(v) => {
+              if (v === "__crm_stage_unresolved__") return;
+              setStageCode(v);
+            }}
+            disabled={readOnly}
+          >
             <SelectTrigger className="border-hairline">
               <SelectValue placeholder="Этап" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__crm_stage_unresolved__" disabled className="text-muted-foreground">
+                {stageCode ? "Этап не найден в справочнике — выберите новый" : "Выберите этап"}
+              </SelectItem>
               {(stages ?? []).map((s) => (
                 <SelectItem key={s.id} value={s.code}>
                   {s.name}
