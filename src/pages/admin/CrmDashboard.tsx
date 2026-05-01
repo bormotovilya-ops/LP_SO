@@ -20,11 +20,9 @@ import { ChartArea, ChartColumn, ChartGantt, ChartLine, CircleDashed } from "luc
 import { getSupabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { format, subDays, startOfDay, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
-import type { CrmPipelineStageRow } from "@/types/crm";
-
-type ContactBrief = { id: string; current_stage_id: string | null; created_at: string };
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type FunnelChartVariant = "bar" | "barHorizontal" | "line" | "area" | "pie";
 
@@ -32,21 +30,95 @@ type TrendChartVariant = "line" | "bar" | "area";
 
 type FunnelRow = { name: string; code: string; count: number };
 
-function buildLast7DaysSeries(contacts: ContactBrief[]) {
-  const days: { key: string; label: string; count: number }[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = startOfDay(subDays(new Date(), i));
-    const key = d.toISOString().slice(0, 10);
-    days.push({ key, label: format(d, "d MMM", { locale: ru }), count: 0 });
+type TrendDatum = { label: string; count: number };
+
+type DashboardMetrics = {
+  total_contacts: number;
+  new_contacts_last_7d: number;
+  funnel: Array<{
+    stage_id: string | null;
+    code: string;
+    name: string;
+    sort_order: number;
+    count: number | string;
+  }>;
+  stage_conversion: Array<{
+    code: string;
+    name: string;
+    sort_order: number;
+    count: number | string;
+    pct_of_previous: number | string | null;
+  }>;
+  top_source_channels: Array<{ channel: string; count: number | string }>;
+  sla_first_activity: {
+    cohort_with_activity: number | string;
+    pct_within_24h: number | string | null;
+    median_hours_to_activity: number | string | null;
+  };
+  new_per_day_utc_7d: Array<{ key: string; count: number | string }>;
+};
+
+function num(x: unknown, fallback = 0): number {
+  if (typeof x === "number" && Number.isFinite(x)) return x;
+  if (typeof x === "bigint") return Number(x);
+  if (typeof x === "string" && x.trim() !== "") {
+    const n = parseFloat(x);
+    return Number.isFinite(n) ? n : fallback;
   }
-  const byKey = new Map(days.map((d) => [d.key, d]));
-  for (const c of contacts) {
-    const t = parseISO(c.created_at);
-    const k = startOfDay(t).toISOString().slice(0, 10);
-    const slot = byKey.get(k);
-    if (slot) slot.count += 1;
+  return fallback;
+}
+
+function unwrapRpcDashboard(data: unknown): Record<string, unknown> | null {
+  if (Array.isArray(data)) {
+    const first = data[0];
+    return first && typeof first === "object" ? (first as Record<string, unknown>) : null;
   }
-  return days;
+  return data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+}
+
+function parseDashboardMetrics(raw: unknown): DashboardMetrics | null {
+  const o = unwrapRpcDashboard(raw);
+  if (!o) return null;
+  return {
+    total_contacts: num(o.total_contacts),
+    new_contacts_last_7d: num(o.new_contacts_last_7d),
+    funnel: Array.isArray(o.funnel) ? (o.funnel as DashboardMetrics["funnel"]) : [],
+    stage_conversion: Array.isArray(o.stage_conversion)
+      ? (o.stage_conversion as DashboardMetrics["stage_conversion"])
+      : [],
+    top_source_channels: Array.isArray(o.top_source_channels)
+      ? (o.top_source_channels as DashboardMetrics["top_source_channels"])
+      : [],
+    sla_first_activity: ((): DashboardMetrics["sla_first_activity"] => {
+      const s = o.sla_first_activity;
+      if (!s || typeof s !== "object") {
+        return { cohort_with_activity: 0, pct_within_24h: null, median_hours_to_activity: null };
+      }
+      const r = s as Record<string, unknown>;
+      return {
+        cohort_with_activity: num(r.cohort_with_activity),
+        pct_within_24h: r.pct_within_24h == null ? null : num(r.pct_within_24h),
+        median_hours_to_activity: r.median_hours_to_activity == null ? null : num(r.median_hours_to_activity),
+      };
+    })(),
+    new_per_day_utc_7d: Array.isArray(o.new_per_day_utc_7d)
+      ? (o.new_per_day_utc_7d as DashboardMetrics["new_per_day_utc_7d"])
+      : [],
+  };
+}
+
+function mapRpcTrendToChart(rows: DashboardMetrics["new_per_day_utc_7d"]): TrendDatum[] {
+  const out: TrendDatum[] = [];
+  for (const r of rows) {
+    let label = r.key ?? "";
+    try {
+      if (r.key) label = format(parseISO(`${r.key}T12:00:00Z`), "d MMM", { locale: ru });
+    } catch {
+      /* keep key */
+    }
+    out.push({ label, count: num(r.count) });
+  }
+  return out;
 }
 
 const chartTooltipStyles = {
@@ -215,7 +287,7 @@ function FunnelChartView({ variant, data }: { variant: FunnelChartVariant; data:
   );
 }
 
-function TrendChartView({ variant, data }: { variant: TrendChartVariant; data: ReturnType<typeof buildLast7DaysSeries> }) {
+function TrendChartView({ variant, data }: { variant: TrendChartVariant; data: TrendDatum[] }) {
   const accentStroke = "hsl(var(--accent))";
 
   if (variant === "bar") {
@@ -278,78 +350,71 @@ export default function CrmDashboard() {
   const [funnelVariant, setFunnelVariant] = useState<FunnelChartVariant>("bar");
   const [trendVariant, setTrendVariant] = useState<TrendChartVariant>("line");
 
-  const stagesQuery = useQuery({
-    queryKey: ["crm", "pipeline-stages"],
+  const { data: metricRaw, isLoading: metricsLoading, error: metricErr } = useQuery({
+    queryKey: ["crm", "dashboard-metrics"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_pipeline_stages")
-        .select("id, code, name, sort_order, is_active")
-        .eq("is_active", true)
-        .order("sort_order");
+      const { data, error } = await supabase.rpc("crm_dashboard_metrics");
       if (error) throw error;
-      return data as CrmPipelineStageRow[];
+      return data as unknown;
     },
   });
 
-  const contactsQuery = useQuery({
-    queryKey: ["crm", "contacts-brief"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_contacts")
-        .select("id, current_stage_id, created_at");
-      if (error) throw error;
-      return (data ?? []) as ContactBrief[];
-    },
-  });
+  const metrics = useMemo(() => parseDashboardMetrics(metricRaw), [metricRaw]);
 
-  const weekAgo = useMemo(() => subDays(new Date(), 7), []);
-  const newInWeek = useMemo(() => {
-    const list = contactsQuery.data ?? [];
-    return list.filter((c) => new Date(c.created_at) >= weekAgo).length;
-  }, [contactsQuery.data, weekAgo]);
+  const funnelData = useMemo<FunnelRow[]>(() => {
+    const f = metrics?.funnel ?? [];
+    return [...f]
+      .sort((a, b) => num(a.sort_order) - num(b.sort_order))
+      .map((s) => ({
+        name: s.name,
+        code: s.code,
+        count: num(s.count),
+      }));
+  }, [metrics?.funnel]);
 
-  const funnelData = useMemo(() => {
-    const stages = stagesQuery.data ?? [];
-    const contacts = contactsQuery.data ?? [];
-    const byStage: Record<string, number> = {};
-    for (const s of stages) {
-      byStage[s.id] = 0;
-    }
-    for (const c of contacts) {
-      if (c.current_stage_id && byStage[c.current_stage_id] !== undefined) {
-        byStage[c.current_stage_id] += 1;
-      }
-    }
-    return stages.map((s) => ({
-      name: s.name,
-      code: s.code,
-      count: byStage[s.id] ?? 0,
+  const trendData = useMemo(() => mapRpcTrendToChart(metrics?.new_per_day_utc_7d ?? []), [metrics?.new_per_day_utc_7d]);
+
+  const sourceBars = useMemo<FunnelRow[]>(() => {
+    const top = metrics?.top_source_channels ?? [];
+    return top.slice(0, 16).map((s) => ({
+      name:
+        (s.channel || "").length > 28 ? `${String(s.channel).slice(0, 26)}…` : String(s.channel || "—"),
+      code: String(s.channel),
+      count: num(s.count),
     }));
-  }, [stagesQuery.data, contactsQuery.data]);
+  }, [metrics?.top_source_channels]);
 
-  const trendData = useMemo(() => buildLast7DaysSeries(contactsQuery.data ?? []), [contactsQuery.data]);
+  const total = metrics?.total_contacts ?? 0;
+  const newInWeek = metrics?.new_contacts_last_7d ?? 0;
+  const stageKinds = (metrics.funnel ?? []).filter((s) => num(s.count) > 0).length;
 
-  const total = contactsQuery.data?.length ?? 0;
+  const isLoading = metricsLoading;
+  const err = metricErr;
 
-  const isLoading = stagesQuery.isLoading || contactsQuery.isLoading;
-  const err = stagesQuery.error || contactsQuery.error;
+  const sla = metrics?.sla_first_activity;
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Загрузка метрик…</p>;
   }
 
-  if (err) {
-    return <p className="text-sm text-destructive">Ошибка загрузки: {(err as Error).message}</p>;
+  if (err || !metrics) {
+    return (
+      <p className="text-sm text-destructive">
+        Ошибка загрузки: {err ? (err as Error).message : "пустой ответ"}
+      </p>
+    );
   }
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-3xl text-foreground">Дашборд</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Сводка по воронке и новым лидам</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Воронка, источники, конверсия между этапами и SLA-прокси по первой активности (последние 30 дней)
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-hairline bg-surface/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-normal uppercase tracking-[0.2em] text-muted-foreground">
@@ -370,14 +435,29 @@ export default function CrmDashboard() {
             <p className="font-display text-4xl text-foreground">{newInWeek}</p>
           </CardContent>
         </Card>
-        <Card className="border-hairline bg-surface/20 sm:col-span-2 lg:col-span-1">
+        <Card className="border-hairline bg-surface/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-normal uppercase tracking-[0.2em] text-muted-foreground">
-              Этапов в воронке
+              Этапов с лидами
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-display text-4xl text-foreground">{(stagesQuery.data ?? []).length}</p>
+            <p className="font-display text-4xl text-foreground">{stageKinds}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-hairline bg-surface/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-normal uppercase tracking-[0.2em] text-muted-foreground">
+              SLA: ≤24 ч до активности*
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="font-display text-4xl text-foreground">
+              {sla?.pct_within_24h != null ? `${num(sla.pct_within_24h)}%` : "—"}
+            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Лиды 30 дн. с признаком last_activity ({num(sla?.cohort_with_activity)} шт.).
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -427,7 +507,9 @@ export default function CrmDashboard() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle className="font-display text-lg">Новые лиды по дням (7 дней)</CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">Тренд создания контактов</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  По UTC-календарным дням (как в базе)
+                </p>
               </div>
               <ToggleGroup
                 type="single"
@@ -455,6 +537,91 @@ export default function CrmDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <Card className="border-hairline bg-surface/20">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">Лиды по каналам (источники)</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Уникальных значений source_channel (до 16 на экране, полный топ в данных).
+            </p>
+          </CardHeader>
+          <CardContent className="h-[280px] pl-0 pt-2">
+            {sourceBars.some((x) => x.count > 0) ? (
+              <FunnelChartView variant="barHorizontal" data={sourceBars} />
+            ) : (
+              <p className="text-sm text-muted-foreground">Нет распределений по источникам.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-hairline bg-surface/20">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">Конверсия к предыдущему этапу воронки</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Доля лидов на этапе относительно предыдущего по порядку sort_order. Первый этап — без доли.
+            </p>
+          </CardHeader>
+          <CardContent className="overflow-x-auto px-2 pt-2">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-hairline">
+                  <TableHead className="text-xs uppercase tracking-wider">Этап</TableHead>
+                  <TableHead className="text-right text-xs uppercase tracking-wider">Лидов</TableHead>
+                  <TableHead className="text-right text-xs uppercase tracking-wider">К пред.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {metrics.stage_conversion.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-muted-foreground">
+                      Нет данных воронки
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  metrics.stage_conversion
+                    .slice()
+                    .sort((a, b) => num(a.sort_order) - num(b.sort_order))
+                    .map((row) => (
+                      <TableRow key={row.code} className="border-hairline">
+                        <TableCell className="max-w-[200px] text-sm">{row.name}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{num(row.count)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                          {row.pct_of_previous == null ? "—" : `${num(row.pct_of_previous)}%`}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-hairline bg-surface/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-display text-lg text-foreground">
+            SLA-прокси: время до первой активности*
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>
+            Считается по лидам за последние 30 дней, у которых заполнены и created_at и last_activity_at.
+            Первая активность здесь трактуется через поле last_activity_at (нет разбора отдельных касаний).
+          </p>
+          <p>
+            Доля лидов, у которых первая зафиксированная активность наступила в течение 24 часов после создания:{" "}
+            <strong className="text-foreground">
+              {sla?.pct_within_24h != null ? `${num(sla.pct_within_24h)}%` : "—"}
+            </strong>
+            . Медиана часов от создания до этой активности:{" "}
+            <strong className="text-foreground">
+              {sla?.median_hours_to_activity != null ? `${num(sla.median_hours_to_activity)} ч` : "—"}
+            </strong>{" "}
+            (выборка: {num(sla?.cohort_with_activity)} контактов).
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

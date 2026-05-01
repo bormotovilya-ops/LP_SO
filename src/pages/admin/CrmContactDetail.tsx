@@ -16,7 +16,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { CrmContactRow, CrmPipelineStageRow, CrmProfileRow, LeadTemperature } from "@/types/crm";
+import type {
+  CrmContactRow,
+  CrmPipelineStageRow,
+  CrmProfileRow,
+  CrmTaskPriority,
+  CrmTaskRow,
+  CrmTaskStatus,
+  LeadTemperature,
+} from "@/types/crm";
 import {
   CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL,
   resolveCrmFunnelSelectValue,
@@ -87,7 +95,7 @@ function parseTelegramIdForUpdate(raw: string): { ok: true; value: number | null
 
 export default function CrmContactDetail() {
   const { id } = useParams<{ id: string }>();
-  const { canWriteCrm, isCrmAdmin } = useAuth();
+  const { canWriteCrm, isCrmAdmin, user } = useAuth();
   const supabase = getSupabase();
   const queryClient = useQueryClient();
   const readOnly = !canWriteCrm;
@@ -166,6 +174,21 @@ export default function CrmContactDetail() {
     },
   });
 
+  const { data: contactTasks = [], refetch: refetchTasks } = useQuery({
+    queryKey: ["crm", "tasks", id],
+    enabled: Boolean(id),
+    queryFn: async () => {
+      const { data, error: qe } = await supabase
+        .from("crm_tasks")
+        .select("*")
+        .eq("contact_id", id!)
+        .order("due_at", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      if (qe) throw qe;
+      return (data ?? []) as CrmTaskRow[];
+    },
+  });
+
   /** Хронология этапов: от старых к новым для чтения «сверху вниз». */
   const stageHistoryChronological = useMemo(
     () => [...stageHistory].sort((a, b) => (a.created_at > b.created_at ? 1 : -1)),
@@ -204,6 +227,13 @@ export default function CrmContactDetail() {
   const [timelineNote, setTimelineNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
 
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskDue, setTaskDue] = useState("");
+  const [taskPriority, setTaskPriority] = useState<CrmTaskPriority>("medium");
+  const [taskAssigneeId, setTaskAssigneeId] = useState<string | null>(null);
+  const [addingTask, setAddingTask] = useState(false);
+
   const [adminSourceDetail, setAdminSourceDetail] = useState("");
   const [adminUtmSource, setAdminUtmSource] = useState("");
   const [adminUtmMedium, setAdminUtmMedium] = useState("");
@@ -221,6 +251,12 @@ export default function CrmContactDetail() {
     () => resolveCrmFunnelSelectValue(stageCode, stageCodes),
     [stageCode, stageCodes],
   );
+
+  useEffect(() => {
+    if (user?.id) {
+      setTaskAssigneeId((prev) => (prev === null ? user.id : prev));
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (!contact) return;
@@ -315,7 +351,9 @@ export default function CrmContactDetail() {
       if (stageCode && stageCode !== currentStageCode) {
         setStageChangeNote("");
       }
-      await queryClient.invalidateQueries({ queryKey: ["crm", "contacts-list"] });
+      await queryClient.invalidateQueries({ queryKey: ["crm", "contacts-page"] });
+      await queryClient.invalidateQueries({ queryKey: ["crm", "contacts-meta"] });
+      await queryClient.invalidateQueries({ queryKey: ["crm", "dashboard-metrics"] });
       await queryClient.invalidateQueries({ queryKey: ["crm", "stage-history", id] });
       await queryClient.invalidateQueries({ queryKey: ["crm", "interactions", id] });
       await refetch();
@@ -348,11 +386,62 @@ export default function CrmContactDetail() {
       setTimelineNote("");
       toast.success("Заметка добавлена в ленту");
       await queryClient.invalidateQueries({ queryKey: ["crm", "interactions", id] });
-      await queryClient.invalidateQueries({ queryKey: ["crm", "contacts-list"] });
+      await queryClient.invalidateQueries({ queryKey: ["crm", "contacts-page"] });
+      await queryClient.invalidateQueries({ queryKey: ["crm", "contacts-meta"] });
+      await queryClient.invalidateQueries({ queryKey: ["crm", "dashboard-metrics"] });
       await refetch();
     } finally {
       setAddingNote(false);
     }
+  };
+
+  const handleAddTask = async () => {
+    if (!id || readOnly) return;
+    const title = taskTitle.trim();
+    if (!title) {
+      toast.error("Введите заголовок задачи");
+      return;
+    }
+    setAddingTask(true);
+    try {
+      const { error: insErr } = await supabase.from("crm_tasks").insert({
+        contact_id: id,
+        title,
+        description: taskDescription.trim() || null,
+        due_at: fromInputDatetimeLocal(taskDue),
+        priority: taskPriority,
+        assignee_user_id: taskAssigneeId,
+        created_by: user?.id ?? null,
+        status: "open",
+      });
+      if (insErr) {
+        toast.error(insErr.message);
+        return;
+      }
+      setTaskTitle("");
+      setTaskDescription("");
+      setTaskDue("");
+      setTaskPriority("medium");
+      toast.success("Задача добавлена");
+      await queryClient.invalidateQueries({ queryKey: ["crm", "tasks", id] });
+      await queryClient.invalidateQueries({ queryKey: ["crm", "tasks-all"] });
+      await refetchTasks();
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
+  const patchTaskStatus = async (taskId: string, status: CrmTaskStatus) => {
+    if (readOnly) return;
+    const { error: upErr } = await supabase.from("crm_tasks").update({ status }).eq("id", taskId);
+    if (upErr) {
+      toast.error(upErr.message);
+      return;
+    }
+    toast.success("Статус задачи обновлён");
+    await queryClient.invalidateQueries({ queryKey: ["crm", "tasks", id] });
+    await queryClient.invalidateQueries({ queryKey: ["crm", "tasks-all"] });
+    await refetchTasks();
   };
 
   if (!id) {
@@ -425,6 +514,12 @@ export default function CrmContactDetail() {
             Воронка
             <span className="rounded-sm bg-background/70 px-1 py-px text-[10px] font-normal tabular-nums text-muted-foreground">
               {stageHistory.length}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="gap-1">
+            Задачи
+            <span className="rounded-sm bg-background/70 px-1 py-px text-[10px] font-normal tabular-nums text-muted-foreground">
+              {contactTasks.length}
             </span>
           </TabsTrigger>
           <TabsTrigger value="activity" className="gap-1">
@@ -722,6 +817,180 @@ export default function CrmContactDetail() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-6 space-y-6 outline-none">
+          {readOnly ? null : (
+            <div className="space-y-4 rounded-sm border border-hairline bg-surface/10 p-4">
+              <h2 className="font-display text-xl text-foreground">Новая задача</h2>
+              <div className="space-y-2">
+                <Label>Заголовок</Label>
+                <Input
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  className="border-hairline"
+                  placeholder="Например: перезвонить, отправить счёт"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Описание</Label>
+                <Textarea
+                  value={taskDescription}
+                  onChange={(e) => setTaskDescription(e.target.value)}
+                  className="min-h-[72px] border-hairline"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Срок</Label>
+                  <Input
+                    type="datetime-local"
+                    value={taskDue}
+                    onChange={(e) => setTaskDue(e.target.value)}
+                    className="border-hairline"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Приоритет</Label>
+                  <Select value={taskPriority} onValueChange={(v) => setTaskPriority(v as CrmTaskPriority)}>
+                    <SelectTrigger className="border-hairline">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Низкий</SelectItem>
+                      <SelectItem value="medium">Средний</SelectItem>
+                      <SelectItem value="high">Высокий</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Исполнитель</Label>
+                <Select
+                  value={taskAssigneeId ?? "__none__"}
+                  onValueChange={(v) => setTaskAssigneeId(v === "__none__" ? null : v)}
+                >
+                  <SelectTrigger className="border-hairline">
+                    <SelectValue placeholder="Не назначен" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Не назначен</SelectItem>
+                    {(managers ?? []).map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.display_name || m.id.slice(0, 8)} ({m.role})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="button" onClick={handleAddTask} disabled={addingTask} variant="secondary">
+                {addingTask ? "Добавление…" : "Добавить задачу"}
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <h2 className="font-display text-xl text-foreground">Список задач</h2>
+            {contactTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Задач пока нет.</p>
+            ) : (
+              <ul className="space-y-2">
+                {contactTasks.map((t) => (
+                  <li key={t.id} className="rounded-sm border border-hairline bg-surface/20 px-3 py-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-foreground">{t.title}</p>
+                        {t.description ? (
+                          <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t.status === "open"
+                            ? "Открыта"
+                            : t.status === "in_progress"
+                              ? "В работе"
+                              : t.status === "done"
+                                ? "Выполнена"
+                                : "Отменена"}
+                          {" · "}
+                          {t.due_at
+                            ? format(parseISO(t.due_at), "d MMM yyyy HH:mm", { locale: ru })
+                            : "без срока"}
+                        </p>
+                      </div>
+                      {readOnly ? null : (
+                        <div className="flex flex-wrap gap-1">
+                          {t.status === "open" ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-hairline text-xs"
+                                onClick={() => patchTaskStatus(t.id, "in_progress")}
+                              >
+                                В работу
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-hairline text-xs"
+                                onClick={() => patchTaskStatus(t.id, "done")}
+                              >
+                                Готово
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-xs text-muted-foreground"
+                                onClick={() => patchTaskStatus(t.id, "cancelled")}
+                              >
+                                Отменить
+                              </Button>
+                            </>
+                          ) : null}
+                          {t.status === "in_progress" ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-hairline text-xs"
+                                onClick={() => patchTaskStatus(t.id, "done")}
+                              >
+                                Готово
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-xs text-muted-foreground"
+                                onClick={() => patchTaskStatus(t.id, "cancelled")}
+                              >
+                                Отменить
+                              </Button>
+                            </>
+                          ) : null}
+                          {t.status === "done" || t.status === "cancelled" ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 border-hairline text-xs"
+                              onClick={() => patchTaskStatus(t.id, "open")}
+                            >
+                              Снова открыть
+                            </Button>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="activity" className="mt-6 space-y-6 outline-none">

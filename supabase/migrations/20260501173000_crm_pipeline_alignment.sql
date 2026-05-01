@@ -1,7 +1,9 @@
 begin;
 
--- sort_order глобально unique: при новой шкале возможны столкновения со старыми строками (например qualified=20 vs diagnostic_requested=20).
--- Временно сдвигаем порядок, затем upsert выставляет целевые значения.
+-- sort_order глобально unique. Без этого UPDATE возможен 23505: «qualified» из mini_crm (20)
+-- конфликтует с INSERT «diagnostic_requested» (20), если блок выше вырезан или транзакция не дошла сюда.
+-- Ещё тот случай: не применили 20260427121000 — тогда перед INSERT нет строки diagnostic_requested (ON CONFLICT),
+-- но qualified всё ещё с sort_order = 20. Сначала выполните scripts/crm/05_repair_pipeline_sort_order_conflicts.sql
 update public.crm_pipeline_stages
 set sort_order = sort_order + 1000000
 where sort_order < 1000000;

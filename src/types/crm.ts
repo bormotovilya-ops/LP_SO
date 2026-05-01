@@ -44,3 +44,20 @@ export type CrmPipelineStageRow = {
   sort_order: number;
   is_active: boolean;
 };
+
+export type CrmTaskStatus = "open" | "in_progress" | "done" | "cancelled";
+export type CrmTaskPriority = "low" | "medium" | "high";
+
+export type CrmTaskRow = {
+  id: string;
+  contact_id: string;
+  title: string;
+  description: string | null;
+  status: CrmTaskStatus;
+  priority: CrmTaskPriority;
+  due_at: string | null;
+  assignee_user_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};

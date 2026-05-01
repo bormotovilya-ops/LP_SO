@@ -17,10 +17,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import type { CrmContactRow, CrmPipelineStageRow, LeadTemperature } from "@/types/crm";
+import { useAuth } from "@/contexts/AuthContext";
+import type { CrmContactRow, CrmPipelineStageRow, CrmProfileRow, LeadTemperature } from "@/types/crm";
 import {
   CRM_CONTACTS_ANY_VALUE as ANY_VALUE,
+  type CrmContactsNextActionPreset,
+  type CrmContactsOwnerFilter,
   type CrmContactsPageSize,
+  type CrmContactsSortKey,
   type DuplicateFilter,
   type QuickSourcePreset,
   coercePageSize,
@@ -28,34 +32,28 @@ import {
   saveCrmContactsFilters,
   summarizeCrmFilters,
 } from "@/lib/crmContactsFiltersStorage";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfDay, endOfDay } from "date-fns";
 import { ru } from "date-fns/locale";
 
-/** Каналы, которые считаем «с сайта» (см. crm_upsert_contact и лендинги). */
-const SITE_SOURCE_CHANNELS = new Set(["site", "site_form", "site_quiz"]);
+type ContactsMetaPayload = {
+  quick_counts?: { all: number; site: number; telegram: number; unknown: number };
+  channels?: unknown;
+  segments?: unknown;
+};
 
-function normalizeLeadTemperature(row: CrmContactRow): LeadTemperature {
-  const t = row.lead_temperature;
-  if (t === "warm" || t === "hot") return t;
-  return "cold";
+type ContactsPageRpcRow = Record<string, unknown>;
+
+function coerceStringArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === "string").sort((a, b) => a.localeCompare(b, "ru"));
 }
 
-function matchesSearch(row: CrmContactRow, q: string): boolean {
-  if (!q) return true;
-  const needle = q.trim().toLowerCase();
-  if (!needle) return true;
-  const parts = [
-    row.full_name,
-    row.email,
-    row.phone,
-    row.source_detail,
-    row.segment,
-    row.utm_source,
-    row.utm_campaign,
-  ]
-    .filter(Boolean)
-    .map((x) => String(x).toLowerCase());
-  return parts.some((p) => p.includes(needle));
+function unwrapRpcJson(data: ContactsPageRpcRow | ContactsPageRpcRow[] | null): ContactsPageRpcRow | null {
+  if (Array.isArray(data)) {
+    const first = data[0];
+    return first && typeof first === "object" ? first : null;
+  }
+  return data && typeof data === "object" ? data : null;
 }
 
 function readStoredState() {
@@ -82,6 +80,26 @@ function readStoredState() {
     qs = s.quickSource;
   }
 
+  let ownerFilter: CrmContactsOwnerFilter = "any";
+  if (s?.ownerFilter === "mine" || s?.ownerFilter === "unassigned" || s?.ownerFilter === "any") {
+    ownerFilter = s.ownerFilter;
+  }
+
+  let sortKey: CrmContactsSortKey = "activity";
+  if (s?.sortKey === "next_action" || s?.sortKey === "created" || s?.sortKey === "activity") {
+    sortKey = s.sortKey;
+  }
+
+  let nextActionPreset: CrmContactsNextActionPreset = "any";
+  if (
+    s?.nextActionPreset === "scheduled" ||
+    s?.nextActionPreset === "overdue" ||
+    s?.nextActionPreset === "today" ||
+    s?.nextActionPreset === "any"
+  ) {
+    nextActionPreset = s.nextActionPreset;
+  }
+
   return {
     filtersPanelOpen: s?.filtersPanelOpen === true,
     quickSource: qs,
@@ -95,6 +113,9 @@ function readStoredState() {
     requirePhone: Boolean(s?.requirePhone),
     requireEmail: Boolean(s?.requireEmail),
     consentYesOnly: Boolean(s?.consentYesOnly),
+    ownerFilter,
+    sortKey,
+    nextActionPreset,
     page: Math.max(1, parseInt(String(s?.page ?? "1"), 10) || 1),
     pageSize: coercePageSize(s?.pageSize),
   };
@@ -102,6 +123,8 @@ function readStoredState() {
 
 export default function CrmContacts() {
   const supabase = getSupabase();
+  const { user, canWriteCrm } = useAuth();
+  const myUserId = user?.id ?? null;
   /** Одноразовое чтение сохранённых фильтров (без парсинга JSON на каждом рендере). */
   const storedInitRef = useRef<ReturnType<typeof readStoredState> | null>(null);
   if (!storedInitRef.current) storedInitRef.current = readStoredState();
@@ -122,6 +145,9 @@ export default function CrmContacts() {
   const [requirePhone, setRequirePhone] = useState(z.requirePhone);
   const [requireEmail, setRequireEmail] = useState(z.requireEmail);
   const [consentYesOnly, setConsentYesOnly] = useState(z.consentYesOnly);
+  const [ownerFilter, setOwnerFilter] = useState<CrmContactsOwnerFilter>(z.ownerFilter);
+  const [sortKey, setSortKey] = useState<CrmContactsSortKey>(z.sortKey);
+  const [nextActionPreset, setNextActionPreset] = useState<CrmContactsNextActionPreset>(z.nextActionPreset);
 
   const [page, setPage] = useState(z.page);
   const [pageSize, setPageSize] = useState<CrmContactsPageSize>(z.pageSize);
@@ -145,6 +171,8 @@ export default function CrmContacts() {
     requirePhone,
     requireEmail,
     consentYesOnly,
+    ownerFilter,
+    nextActionPreset,
   ]);
 
   useEffect(() => {
@@ -162,6 +190,9 @@ export default function CrmContacts() {
       requirePhone,
       requireEmail,
       consentYesOnly,
+      ownerFilter,
+      sortKey,
+      nextActionPreset,
       page,
       pageSize,
     });
@@ -170,6 +201,8 @@ export default function CrmContacts() {
     duplicateFilter,
     exactChannel,
     filtersPanelOpen,
+    nextActionPreset,
+    ownerFilter,
     page,
     pageSize,
     quickSource,
@@ -178,6 +211,7 @@ export default function CrmContacts() {
     requireTelegramId,
     searchText,
     segmentExact,
+    sortKey,
     stageId,
     temperatureFilter,
   ]);
@@ -194,34 +228,109 @@ export default function CrmContacts() {
     },
   });
 
-  const { data: contacts, isLoading, error } = useQuery({
-    queryKey: ["crm", "contacts-list"],
+  const { data: profileNamesById } = useQuery({
+    queryKey: ["crm", "profiles-display-names"],
     queryFn: async () => {
-      const { data, error: qErr } = await supabase
-        .from("crm_contacts")
-        .select(
-          [
-            "id",
-            "full_name",
-            "phone",
-            "email",
-            "telegram_id",
-            "source_channel",
-            "source_detail",
-            "utm_source",
-            "utm_campaign",
-            "segment",
-            "lead_temperature",
-            "is_duplicate",
-            "consent_personal_data",
-            "current_stage_id",
-            "last_activity_at",
-            "created_at",
-          ].join(", "),
-        )
-        .order("last_activity_at", { ascending: false, nullsFirst: false });
-      if (qErr) throw qErr;
-      return (data ?? []) as CrmContactRow[];
+      const { data, error: pe } = await supabase
+        .from("crm_profiles")
+        .select("id, display_name")
+        .eq("is_active", true);
+      if (pe) throw pe;
+      const m = new Map<string, string>();
+      for (const row of (data ?? []) as Pick<CrmProfileRow, "id" | "display_name">[]) {
+        m.set(row.id, row.display_name?.trim() || row.id.slice(0, 8));
+      }
+      return m;
+    },
+  });
+
+  const { data: contactsMetaPayload, isLoading: metaLoading, error: metaErr } = useQuery({
+    queryKey: ["crm", "contacts-meta"],
+    queryFn: async () => {
+      const { data, error: qe } = await supabase.rpc("crm_contacts_meta");
+      if (qe) throw qe;
+      return unwrapRpcJson(data as ContactsPageRpcRow | ContactsPageRpcRow[] | null) as ContactsMetaPayload | null;
+    },
+  });
+
+  const naDayBounds = useMemo(() => {
+    if (nextActionPreset !== "today") {
+      return { start: null as string | null, end: null as string | null };
+    }
+    return {
+      start: startOfDay(new Date()).toISOString(),
+      end: endOfDay(new Date()).toISOString(),
+    };
+  }, [nextActionPreset]);
+
+  const listRpcBase = useMemo(
+    () => ({
+      p_quick_source: quickSource,
+      p_exact_channel:
+        exactChannel !== ANY_VALUE && String(exactChannel).trim() ? String(exactChannel).trim() : null,
+      p_stage_id: stageId !== ANY_VALUE ? stageId : null,
+      p_temperature: temperatureFilter !== ANY_VALUE ? temperatureFilter : null,
+      p_duplicate_filter: duplicateFilter,
+      p_segment_exact: segmentExact !== ANY_VALUE ? segmentExact : null,
+      p_search: searchText.trim() || null,
+      p_require_telegram: requireTelegramId,
+      p_require_phone: requirePhone,
+      p_require_email: requireEmail,
+      p_consent_only: consentYesOnly,
+      p_owner_filter: ownerFilter,
+      p_my_user_id: myUserId,
+      p_next_action_preset: nextActionPreset,
+      p_na_day_start: naDayBounds.start,
+      p_na_day_end: naDayBounds.end,
+    }),
+    [
+      consentYesOnly,
+      duplicateFilter,
+      exactChannel,
+      myUserId,
+      naDayBounds.end,
+      naDayBounds.start,
+      nextActionPreset,
+      ownerFilter,
+      quickSource,
+      requireEmail,
+      requirePhone,
+      requireTelegramId,
+      searchText,
+      segmentExact,
+      stageId,
+      temperatureFilter,
+    ],
+  );
+
+  const {
+    data: contactsPagePayload,
+    isLoading: contactsPageLoading,
+    error: contactsPageErr,
+  } = useQuery({
+    queryKey: ["crm", "contacts-page", listRpcBase, sortKey, pageSize, page],
+    queryFn: async () => {
+      const offset = Math.max(0, (page - 1) * pageSize);
+      const { data, error: qe } = await supabase.rpc("crm_list_contacts_page", {
+        ...listRpcBase,
+        p_sort: sortKey,
+        p_limit: pageSize,
+        p_offset: offset,
+      });
+      if (qe) throw qe;
+      const raw = unwrapRpcJson(data as ContactsPageRpcRow | ContactsPageRpcRow[] | null);
+      const tr = raw?.total;
+      const total =
+        typeof tr === "bigint"
+          ? Number(tr)
+          : typeof tr === "string"
+            ? parseInt(tr, 10)
+            : Number(tr ?? 0);
+      const rowsRaw = raw?.rows;
+      const rows = Array.isArray(rowsRaw)
+        ? (rowsRaw.filter((x) => x && typeof x === "object") as CrmContactRow[])
+        : [];
+      return { rows, total: Number.isFinite(total) ? total : 0 };
     },
   });
 
@@ -231,125 +340,38 @@ export default function CrmContacts() {
     return m;
   }, [stages]);
 
-  const allContacts = contacts ?? [];
+  const quickCounts = {
+    all: contactsMetaPayload?.quick_counts?.all ?? 0,
+    site: contactsMetaPayload?.quick_counts?.site ?? 0,
+    telegramN: contactsMetaPayload?.quick_counts?.telegram ?? 0,
+    unknown: contactsMetaPayload?.quick_counts?.unknown ?? 0,
+  };
 
-  const distinctChannels = useMemo(() => {
-    const s = new Set(allContacts.map((c) => c.source_channel ?? "").filter(Boolean));
-    return [...s].sort((a, b) => a.localeCompare(b, "ru"));
-  }, [allContacts]);
+  const distinctChannels = useMemo(
+    () => coerceStringArray(contactsMetaPayload?.channels),
+    [contactsMetaPayload?.channels],
+  );
 
-  const distinctSegments = useMemo(() => {
-    const s = new Set(allContacts.map((c) => c.segment?.trim()).filter(Boolean) as string[]);
-    return [...s].sort((a, b) => a.localeCompare(b, "ru"));
-  }, [allContacts]);
+  const distinctSegments = useMemo(
+    () => coerceStringArray(contactsMetaPayload?.segments),
+    [contactsMetaPayload?.segments],
+  );
 
-  const quickCounts = useMemo(() => {
-    const site = allContacts.filter((c) => SITE_SOURCE_CHANNELS.has((c.source_channel || "").trim()));
-    const telegram = allContacts.filter((c) => Boolean(c.telegram_id) || c.source_channel === "telegram_bot");
-    const unknown = allContacts.filter((c) => {
-      const ch = (c.source_channel || "").trim();
-      return !ch || ch === "unknown";
-    });
-    return {
-      all: allContacts.length,
-      site: site.length,
-      telegramN: telegram.length,
-      unknown: unknown.length,
-    };
-  }, [allContacts]);
-
-  const filteredContacts = useMemo(() => {
-    let list = allContacts;
-
-    if (exactChannel !== ANY_VALUE) {
-      list = list.filter((c) => (c.source_channel || "").trim() === exactChannel);
-    } else {
-      switch (quickSource) {
-        case "site":
-          list = list.filter((c) => SITE_SOURCE_CHANNELS.has((c.source_channel || "").trim()));
-          break;
-        case "telegram":
-          list = list.filter((c) => Boolean(c.telegram_id) || c.source_channel === "telegram_bot");
-          break;
-        case "unknown":
-          list = list.filter((c) => {
-            const ch = (c.source_channel || "").trim();
-            return !ch || ch === "unknown";
-          });
-          break;
-        default:
-          break;
-      }
-    }
-
-    if (stageId !== ANY_VALUE) {
-      list = list.filter((c) => c.current_stage_id === stageId);
-    }
-
-    if (temperatureFilter !== ANY_VALUE) {
-      list = list.filter((c) => normalizeLeadTemperature(c) === temperatureFilter);
-    }
-
-    if (duplicateFilter === "only") {
-      list = list.filter((c) => c.is_duplicate === true);
-    } else if (duplicateFilter === "hide") {
-      list = list.filter((c) => !c.is_duplicate);
-    }
-
-    if (segmentExact !== ANY_VALUE) {
-      list = list.filter((c) => (c.segment || "").trim() === segmentExact);
-    }
-
-    if (requireTelegramId) {
-      list = list.filter((c) => c.telegram_id != null);
-    }
-    if (requirePhone) {
-      list = list.filter((c) => !!c.phone && c.phone.trim() !== "");
-    }
-    if (requireEmail) {
-      list = list.filter((c) => !!c.email && c.email.trim() !== "");
-    }
-    if (consentYesOnly) {
-      list = list.filter((c) => c.consent_personal_data === true);
-    }
-
-    if (searchText.trim()) {
-      list = list.filter((c) => matchesSearch(c, searchText));
-    }
-
-    return list;
-  }, [
-    allContacts,
-    consentYesOnly,
-    duplicateFilter,
-    exactChannel,
-    quickSource,
-    requireEmail,
-    requirePhone,
-    requireTelegramId,
-    searchText,
-    segmentExact,
-    stageId,
-    temperatureFilter,
-  ]);
-
-  const totalFiltered = filteredContacts.length;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
-  const effectivePage = Math.min(Math.max(1, page), totalPages);
+  const totalFiltered = contactsPagePayload?.total ?? 0;
+  const totalPages = totalFiltered <= 0 ? 1 : Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const displayPage = Math.min(Math.max(1, page), totalPages);
 
   useEffect(() => {
-    if (page !== effectivePage) {
-      setPage(effectivePage);
+    if (page !== displayPage) {
+      setPage(displayPage);
     }
-  }, [page, effectivePage]);
+  }, [page, displayPage]);
 
-  const pagedContacts = useMemo(() => {
-    const start = (effectivePage - 1) * pageSize;
-    return filteredContacts.slice(start, start + pageSize);
-  }, [effectivePage, filteredContacts, pageSize]);
+  const pagedContacts = contactsPagePayload?.rows ?? [];
 
-  const rangeFrom = totalFiltered === 0 ? 0 : (effectivePage - 1) * pageSize + 1;
-  const rangeTo = Math.min(totalFiltered, effectivePage * pageSize);
+  const rangeFrom = totalFiltered === 0 ? 0 : (displayPage - 1) * pageSize + 1;
+  const rangeTo =
+    totalFiltered === 0 ? 0 : Math.min(totalFiltered, displayPage * pageSize);
 
   const persistSnapshot = {
     filtersPanelOpen,
@@ -364,6 +386,9 @@ export default function CrmContacts() {
     requirePhone,
     requireEmail,
     consentYesOnly,
+    ownerFilter,
+    sortKey,
+    nextActionPreset,
     page,
     pageSize,
   };
@@ -382,20 +407,28 @@ export default function CrmContacts() {
     setRequirePhone(false);
     setRequireEmail(false);
     setConsentYesOnly(false);
+    setOwnerFilter("any");
+    setNextActionPreset("any");
     setPage(1);
   };
 
-  if (sLoading || isLoading) {
+  if (sLoading || contactsPageLoading || metaLoading) {
     return <p className="text-sm text-muted-foreground">Загрузка…</p>;
   }
 
-  if (error || sErr) {
-    return <p className="text-sm text-destructive">Ошибка: {(error ?? sErr)!.message}</p>;
+  if (contactsPageErr || metaErr || sErr) {
+    return (
+      <p className="text-sm text-destructive">
+        Ошибка: {(contactsPageErr ?? metaErr ?? sErr)!.message}
+      </p>
+    );
   }
 
   const hasActiveFilters =
     quickSource !== "all" ||
     exactChannel !== ANY_VALUE ||
+    ownerFilter !== "any" ||
+    nextActionPreset !== "any" ||
     stageId !== ANY_VALUE ||
     temperatureFilter !== ANY_VALUE ||
     duplicateFilter !== "any" ||
@@ -408,11 +441,18 @@ export default function CrmContacts() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-3xl text-foreground">Контакты</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Список лидов, сортировка по последней активности. Фильтры сохраняются в этом браузере.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl text-foreground">Контакты</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Список лидов и рабочие фильтры (мои, следующий шаг, сортировка). Фильтры сохраняются в этом браузере.
+          </p>
+        </div>
+        {canWriteCrm ? (
+          <Button type="button" variant="outline" size="sm" className="h-9 shrink-0 border-hairline" asChild>
+            <Link to="/admin/crm/contacts/new">Новый контакт</Link>
+          </Button>
+        ) : null}
       </div>
 
       <Collapsible open={filtersPanelOpen} onOpenChange={setFiltersPanelOpen}>
@@ -566,6 +606,41 @@ export default function CrmContacts() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Ответственный</Label>
+                  <Select
+                    value={ownerFilter}
+                    onValueChange={(v) => setOwnerFilter(v as CrmContactsOwnerFilter)}
+                  >
+                    <SelectTrigger className="border-hairline">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Все</SelectItem>
+                      <SelectItem value="mine">Только мои</SelectItem>
+                      <SelectItem value="unassigned">Без ответственного</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Следующее действие</Label>
+                  <Select
+                    value={nextActionPreset}
+                    onValueChange={(v) => setNextActionPreset(v as CrmContactsNextActionPreset)}
+                  >
+                    <SelectTrigger className="border-hairline">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Не фильтровать</SelectItem>
+                      <SelectItem value="scheduled">Запланировано (есть дата)</SelectItem>
+                      <SelectItem value="overdue">Просрочено</SelectItem>
+                      <SelectItem value="today">Сегодня</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Сегмент</Label>
                   <Select value={segmentExact} onValueChange={setSegmentExact}>
                     <SelectTrigger className="border-hairline">
@@ -628,6 +703,19 @@ export default function CrmContacts() {
           </span>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
+              <Label className="whitespace-nowrap text-xs text-muted-foreground">Сортировка</Label>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as CrmContactsSortKey)}>
+                <SelectTrigger className="h-9 min-w-[200px] border-hairline">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="activity">По активности</SelectItem>
+                  <SelectItem value="next_action">По следующему шагу</SelectItem>
+                  <SelectItem value="created">По дате создания</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
               <Label className="whitespace-nowrap text-xs text-muted-foreground">На странице</Label>
               <Select
                 value={String(pageSize)}
@@ -654,20 +742,20 @@ export default function CrmContacts() {
                 variant="outline"
                 size="sm"
                 className="h-9 border-hairline"
-                disabled={effectivePage <= 1}
+                disabled={displayPage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
                 Назад
               </Button>
               <span className="font-mono text-xs text-muted-foreground">
-                {effectivePage}&nbsp;/&nbsp;{totalPages}
+                {displayPage}&nbsp;/&nbsp;{totalPages}
               </span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="h-9 border-hairline"
-                disabled={effectivePage >= totalPages}
+                disabled={displayPage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
                 Вперёд
@@ -685,6 +773,8 @@ export default function CrmContacts() {
                 <TableHead className="text-xs uppercase tracking-wider">Email</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Источник</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Этап</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider">Ответств.</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider">След. шаг</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Активность</TableHead>
               </TableRow>
             </TableHeader>
@@ -710,6 +800,16 @@ export default function CrmContacts() {
                   <TableCell className="text-sm">
                     {c.current_stage_id ? (stageNameById.get(c.current_stage_id) ?? "—") : "—"}
                   </TableCell>
+                  <TableCell className="max-w-[140px] truncate text-sm text-muted-foreground">
+                    {!c.owner_user_id
+                      ? "—"
+                      : (profileNamesById?.get(c.owner_user_id) ?? `id ${c.owner_user_id.slice(0, 8)}`)}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {c.next_action_at
+                      ? format(parseISO(c.next_action_at), "d MMM yyyy HH:mm", { locale: ru })
+                      : "—"}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {c.last_activity_at
                       ? format(parseISO(c.last_activity_at), "d MMM yyyy HH:mm", { locale: ru })
@@ -717,9 +817,9 @@ export default function CrmContacts() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredContacts.length === 0 ? (
+              {totalFiltered === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     Нет контактов по выбранным фильтрам
                   </TableCell>
                 </TableRow>

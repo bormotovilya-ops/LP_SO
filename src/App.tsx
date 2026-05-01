@@ -10,8 +10,10 @@ import { CrmLayout } from "@/components/admin/CrmLayout";
 import { ProtectedCrmRoute } from "@/components/admin/ProtectedCrmRoute";
 import AdminLogin from "./pages/admin/AdminLogin.tsx";
 import CrmContactDetail from "./pages/admin/CrmContactDetail.tsx";
+import CrmContactNew from "./pages/admin/CrmContactNew.tsx";
 import CrmContacts from "./pages/admin/CrmContacts.tsx";
 import CrmDashboard from "./pages/admin/CrmDashboard.tsx";
+import CrmTasks from "./pages/admin/CrmTasks.tsx";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Oferta from "./pages/Oferta.tsx";
@@ -69,7 +71,9 @@ const App = () => (
                 }
               >
                 <Route index element={<CrmDashboard />} />
+                <Route path="tasks" element={<CrmTasks />} />
                 <Route path="contacts" element={<CrmContacts />} />
+                <Route path="contacts/new" element={<CrmContactNew />} />
                 <Route path="contacts/:id" element={<CrmContactDetail />} />
               </Route>
               <Route path="/" element={<Index />} />

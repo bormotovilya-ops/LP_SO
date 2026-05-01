@@ -4,6 +4,12 @@ export const CRM_CONTACTS_FILTERS_LS_KEY = "lp_so:crm-contacts:v1";
 
 export type QuickSourcePreset = "all" | "site" | "telegram" | "unknown";
 export type DuplicateFilter = "any" | "only" | "hide";
+/** Фильтр по ответственному на списке контактов. */
+export type CrmContactsOwnerFilter = "any" | "mine" | "unassigned";
+/** Сортировка списка после фильтров. */
+export type CrmContactsSortKey = "activity" | "next_action" | "created";
+/** Быстрый фильтр по полю «следующее действие». */
+export type CrmContactsNextActionPreset = "any" | "scheduled" | "overdue" | "today";
 
 const LEGAL_PAGE_SIZES = [10, 25, 50, 100] as const;
 export type CrmContactsPageSize = (typeof LEGAL_PAGE_SIZES)[number];
@@ -22,6 +28,9 @@ export type CrmContactsFiltersPersist = {
   requirePhone: boolean;
   requireEmail: boolean;
   consentYesOnly: boolean;
+  ownerFilter: CrmContactsOwnerFilter;
+  sortKey: CrmContactsSortKey;
+  nextActionPreset: CrmContactsNextActionPreset;
   page: number;
   pageSize: CrmContactsPageSize;
 };
@@ -82,6 +91,13 @@ export function summarizeCrmFilters(s: Omit<CrmContactsFiltersPersist, "v">): st
   if (s.requirePhone) parts.push("есть тел.");
   if (s.requireEmail) parts.push("есть email");
   if (s.consentYesOnly) parts.push("ПДн");
+  if (s.ownerFilter === "mine") parts.push("мои");
+  if (s.ownerFilter === "unassigned") parts.push("без ответств.");
+  if (s.nextActionPreset === "scheduled") parts.push("есть дата шага");
+  if (s.nextActionPreset === "overdue") parts.push("просроч. шаг");
+  if (s.nextActionPreset === "today") parts.push("шаг сегодня");
+  if (s.sortKey === "next_action") parts.push("сорт.: след. шаг");
+  if (s.sortKey === "created") parts.push("сорт.: создан");
 
   return parts.length ? parts.join(" · ") : null;
 }

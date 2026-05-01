@@ -31,6 +31,9 @@ export function CrmLayout() {
               <NavLink to="/admin/crm/contacts" className={navClass}>
                 Контакты
               </NavLink>
+              <NavLink to="/admin/crm/tasks" className={navClass}>
+                Задачи
+              </NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-3">
