@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CrmContactRow, CrmPipelineStageRow, CrmProfileRow, LeadTemperature } from "@/types/crm";
 import {
   CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL,
@@ -383,7 +384,7 @@ export default function CrmContactDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8">
       <div>
         <Link
           to="/admin/crm/contacts"
@@ -416,340 +417,373 @@ export default function CrmContactDetail() {
         </p>
       ) : null}
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <Tabs defaultValue="main" className="w-full">
+        <TabsList className="mb-1 flex h-auto min-h-10 w-full flex-wrap justify-start gap-1 rounded-md bg-muted p-1 sm:w-auto">
+          <TabsTrigger value="main">Основное</TabsTrigger>
+          {isCrmAdmin ? <TabsTrigger value="source">Источник · UTM</TabsTrigger> : null}
+          <TabsTrigger value="pipeline" className="gap-1">
+            Воронка
+            <span className="rounded-sm bg-background/70 px-1 py-px text-[10px] font-normal tabular-nums text-muted-foreground">
+              {stageHistory.length}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="gap-1">
+            Лента
+            <span className="rounded-sm bg-background/70 px-1 py-px text-[10px] font-normal tabular-nums text-muted-foreground">
+              {interactions.length}
+            </span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="main" forceMount className="mt-6 space-y-4 outline-none data-[state=inactive]:hidden">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Имя</Label>
+              <Input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="border-hairline"
+                disabled={readOnly}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Телефон</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="border-hairline"
+                disabled={readOnly}
+              />
+            </div>
+          </div>
           <div className="space-y-2">
-            <Label>Имя</Label>
+            <Label>Email</Label>
             <Input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="border-hairline"
               disabled={readOnly}
             />
           </div>
+
           <div className="space-y-2">
-            <Label>Телефон</Label>
+            <Label>Этап воронки</Label>
+            <Select
+              value={funnelSelectValue}
+              onValueChange={(v) => {
+                if (v === CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL) return;
+                setStageCode(v);
+              }}
+              disabled={readOnly}
+            >
+              <SelectTrigger className="border-hairline">
+                <SelectValue placeholder="Этап" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL} disabled className="text-muted-foreground">
+                  {stageCode ? "Этап не найден в справочнике — выберите новый" : "Выберите этап"}
+                </SelectItem>
+                {(stages ?? []).map((s) => (
+                  <SelectItem key={s.id} value={s.code}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Комментарий к смене этапа (попадёт в историю)</Label>
+            <Textarea
+              value={stageChangeNote}
+              onChange={(e) => setStageChangeNote(e.target.value)}
+              placeholder="Если меняете этап — опишите причину. Необязательно: по умолчанию будет стандартная пометка."
+              className="min-h-[72px] border-hairline"
+              disabled={readOnly}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Ответственный</Label>
+            <Select
+              value={ownerId ?? "__none__"}
+              onValueChange={(v) => setOwnerId(v === "__none__" ? null : v)}
+              disabled={readOnly}
+            >
+              <SelectTrigger className="border-hairline">
+                <SelectValue placeholder="Не назначен" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Не назначен</SelectItem>
+                {(managers ?? []).map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.display_name || m.id.slice(0, 8)} ({m.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Следующее действие</Label>
             <Input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              type="datetime-local"
+              value={nextAction}
+              onChange={(e) => setNextAction(e.target.value)}
               className="border-hairline"
               disabled={readOnly}
             />
           </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Email</Label>
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="border-hairline"
-            disabled={readOnly}
-          />
-        </div>
 
-        <div className="space-y-2">
-          <Label>Этап воронки</Label>
-          <Select
-            value={funnelSelectValue}
-            onValueChange={(v) => {
-              if (v === CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL) return;
-              setStageCode(v);
-            }}
-            disabled={readOnly}
-          >
-            <SelectTrigger className="border-hairline">
-              <SelectValue placeholder="Этап" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL} disabled className="text-muted-foreground">
-                {stageCode ? "Этап не найден в справочнике — выберите новый" : "Выберите этап"}
-              </SelectItem>
-              {(stages ?? []).map((s) => (
-                <SelectItem key={s.id} value={s.code}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          <div className="space-y-2">
+            <Label>Комментарий</Label>
+            <Textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              className="min-h-[100px] border-hairline"
+              disabled={readOnly}
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label>Комментарий к смене этапа (попадёт в историю)</Label>
-          <Textarea
-            value={stageChangeNote}
-            onChange={(e) => setStageChangeNote(e.target.value)}
-            placeholder="Если меняете этап — опишите причину. Необязательно: по умолчанию будет стандартная пометка."
-            className="min-h-[72px] border-hairline"
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Ответственный</Label>
-          <Select
-            value={ownerId ?? "__none__"}
-            onValueChange={(v) => setOwnerId(v === "__none__" ? null : v)}
-            disabled={readOnly}
-          >
-            <SelectTrigger className="border-hairline">
-              <SelectValue placeholder="Не назначен" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Не назначен</SelectItem>
-              {(managers ?? []).map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.display_name || m.id.slice(0, 8)} ({m.role})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Следующее действие</Label>
-          <Input
-            type="datetime-local"
-            value={nextAction}
-            onChange={(e) => setNextAction(e.target.value)}
-            className="border-hairline"
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Комментарий</Label>
-          <Textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            className="min-h-[100px] border-hairline"
-            disabled={readOnly}
-          />
-        </div>
+          {readOnly ? null : (
+            <Button type="button" onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
+              {saving ? "Сохранение…" : "Сохранить"}
+            </Button>
+          )}
+        </TabsContent>
 
         {isCrmAdmin ? (
-          <div className="space-y-4 rounded-sm border border-hairline bg-surface/15 p-4">
-            <h3 className="font-display text-lg text-foreground">Администратор: источник и поля карточки</h3>
-            <p className="text-xs text-muted-foreground">
-              Доступно только роли admin. Менеджеры видят и правят основные поля выше; здесь — UTM, сегмент, Telegram ID и
-              прочее.
-            </p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Канал источника (source_channel)</Label>
-                <Input
-                  value={adminSourceChannel}
-                  onChange={(e) => setAdminSourceChannel(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                />
+          <TabsContent value="source" forceMount className="mt-6 space-y-4 outline-none data-[state=inactive]:hidden">
+            <div className="space-y-4 rounded-sm border border-hairline bg-surface/15 p-4">
+              <div>
+                <h3 className="font-display text-lg text-foreground">Источник и технические поля</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Канал, UTM, сегмент, Telegram ID и прочее. «Сохранить» на этой вкладке или «Основное» сохранит оба набора полей одним действием.
+                </p>
               </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Детализация источника</Label>
-                <Input
-                  value={adminSourceDetail}
-                  onChange={(e) => setAdminSourceDetail(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Канал источника (source_channel)</Label>
+                  <Input
+                    value={adminSourceChannel}
+                    onChange={(e) => setAdminSourceChannel(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Детализация источника</Label>
+                  <Input
+                    value={adminSourceDetail}
+                    onChange={(e) => setAdminSourceDetail(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>UTM source</Label>
+                  <Input
+                    value={adminUtmSource}
+                    onChange={(e) => setAdminUtmSource(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>UTM medium</Label>
+                  <Input
+                    value={adminUtmMedium}
+                    onChange={(e) => setAdminUtmMedium(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>UTM campaign</Label>
+                  <Input
+                    value={adminUtmCampaign}
+                    onChange={(e) => setAdminUtmCampaign(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>UTM content</Label>
+                  <Input
+                    value={adminUtmContent}
+                    onChange={(e) => setAdminUtmContent(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>UTM term</Label>
+                  <Input
+                    value={adminUtmTerm}
+                    onChange={(e) => setAdminUtmTerm(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Сегмент</Label>
+                  <Input
+                    value={adminSegment}
+                    onChange={(e) => setAdminSegment(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Температура лида</Label>
+                  <Select
+                    value={adminLeadTemperature}
+                    onValueChange={(v) => setAdminLeadTemperature(v as LeadTemperature)}
+                    disabled={readOnly}
+                  >
+                    <SelectTrigger className="border-hairline">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cold">Холодный</SelectItem>
+                      <SelectItem value="warm">Тёплый</SelectItem>
+                      <SelectItem value="hot">Горячий</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Telegram ID (число)</Label>
+                  <Input
+                    value={adminTelegramId}
+                    onChange={(e) => setAdminTelegramId(e.target.value)}
+                    className="border-hairline"
+                    disabled={readOnly}
+                    inputMode="numeric"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>UTM source</Label>
-                <Input
-                  value={adminUtmSource}
-                  onChange={(e) => setAdminUtmSource(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>UTM medium</Label>
-                <Input
-                  value={adminUtmMedium}
-                  onChange={(e) => setAdminUtmMedium(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>UTM campaign</Label>
-                <Input
-                  value={adminUtmCampaign}
-                  onChange={(e) => setAdminUtmCampaign(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>UTM content</Label>
-                <Input
-                  value={adminUtmContent}
-                  onChange={(e) => setAdminUtmContent(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>UTM term</Label>
-                <Input
-                  value={adminUtmTerm}
-                  onChange={(e) => setAdminUtmTerm(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Сегмент</Label>
-                <Input
-                  value={adminSegment}
-                  onChange={(e) => setAdminSegment(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Температура лида</Label>
-                <Select
-                  value={adminLeadTemperature}
-                  onValueChange={(v) => setAdminLeadTemperature(v as LeadTemperature)}
-                  disabled={readOnly}
-                >
-                  <SelectTrigger className="border-hairline">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cold">Холодный</SelectItem>
-                    <SelectItem value="warm">Тёплый</SelectItem>
-                    <SelectItem value="hot">Горячий</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Telegram ID (число)</Label>
-                <Input
-                  value={adminTelegramId}
-                  onChange={(e) => setAdminTelegramId(e.target.value)}
-                  className="border-hairline"
-                  disabled={readOnly}
-                  inputMode="numeric"
-                />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={adminIsDuplicate}
+                    onCheckedChange={(c) => setAdminIsDuplicate(c === true)}
+                    disabled={readOnly}
+                  />
+                  Дубликат
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={adminConsent}
+                    onCheckedChange={(c) => setAdminConsent(c === true)}
+                    disabled={readOnly}
+                  />
+                  Согласие на обработку ПДн
+                </label>
               </div>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <Checkbox
-                  checked={adminIsDuplicate}
-                  onCheckedChange={(c) => setAdminIsDuplicate(c === true)}
-                  disabled={readOnly}
-                />
-                Дубликат
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <Checkbox
-                  checked={adminConsent}
-                  onCheckedChange={(c) => setAdminConsent(c === true)}
-                  disabled={readOnly}
-                />
-                Согласие на обработку ПДн
-              </label>
-            </div>
-          </div>
+            {readOnly ? null : (
+              <Button type="button" onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
+                {saving ? "Сохранение…" : "Сохранить изменения"}
+              </Button>
+            )}
+          </TabsContent>
         ) : null}
 
-        {readOnly ? null : (
-          <Button type="button" onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
-            {saving ? "Сохранение…" : "Сохранить"}
-          </Button>
-        )}
-      </div>
-
-      {readOnly ? null : (
-        <div className="space-y-3 rounded-sm border border-hairline bg-surface/10 p-4">
-          <h2 className="font-display text-xl text-foreground">Добавить заметку в ленту</h2>
+        <TabsContent value="pipeline" className="mt-6 space-y-3 outline-none">
+          <h2 className="font-display text-xl text-foreground">История этапов</h2>
           <p className="text-xs text-muted-foreground">
-            Текст сохранится в событиях (не заменяет поле «Комментарий» в карточке). Удобно для хроники переговоров.
+            Полная хронология смен этапов (до {CRM_HISTORY_FETCH_LIMIT} записей). Сверху вниз: от более ранних к более
+            поздним.
           </p>
-          <Textarea
-            value={timelineNote}
-            onChange={(e) => setTimelineNote(e.target.value)}
-            className="min-h-[88px] border-hairline"
-            placeholder="Например: отправили оффер в Telegram…"
-          />
-          <Button type="button" onClick={handleAddTimelineNote} disabled={addingNote} variant="secondary">
-            {addingNote ? "Отправка…" : "Добавить в ленту"}
-          </Button>
-        </div>
-      )}
+          {stageHistoryChronological.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Пока нет переходов между этапами.</p>
+          ) : (
+            <div className="space-y-2">
+              {stageHistoryChronological.map((item) => {
+                const fromName = item.from_stage_id ? (stageNameById.get(item.from_stage_id) ?? "—") : "—";
+                const toName = stageNameById.get(item.to_stage_id) ?? "Неизвестный этап";
+                return (
+                  <div key={item.id} className="rounded-sm border border-hairline bg-surface/20 px-3 py-2">
+                    <p className="text-sm text-foreground">
+                      <span className="font-medium">{fromName}</span>
+                      <span className="text-muted-foreground"> → </span>
+                      <span className="font-medium">{toName}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.changed_by} · причина: {item.reason}
+                      {item.note ? ` · ${item.note}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {format(parseISO(item.created_at), "d MMM yyyy, HH:mm", { locale: ru })}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
 
-      <div className="space-y-3">
-        <h2 className="font-display text-xl text-foreground">История этапов</h2>
-        <p className="text-xs text-muted-foreground">
-          Полная хронология смен этапов (до {CRM_HISTORY_FETCH_LIMIT} записей). Сверху вниз: от более ранних к более
-          поздним.
-        </p>
-        {stageHistoryChronological.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Пока нет переходов между этапами.</p>
-        ) : (
-          <div className="space-y-2">
-            {stageHistoryChronological.map((item) => {
-              const fromName = item.from_stage_id ? (stageNameById.get(item.from_stage_id) ?? "—") : "—";
-              const toName = stageNameById.get(item.to_stage_id) ?? "Неизвестный этап";
-              return (
-                <div key={item.id} className="rounded-sm border border-hairline bg-surface/20 px-3 py-2">
-                  <p className="text-sm text-foreground">
-                    <span className="font-medium">{fromName}</span>
-                    <span className="text-muted-foreground"> → </span>
-                    <span className="font-medium">{toName}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {item.changed_by} · причина: {item.reason}
-                    {item.note ? ` · ${item.note}` : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {format(parseISO(item.created_at), "d MMM yyyy, HH:mm", { locale: ru })}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+        <TabsContent value="activity" className="mt-6 space-y-6 outline-none">
+          {readOnly ? null : (
+            <div className="space-y-3 rounded-sm border border-hairline bg-surface/10 p-4">
+              <div>
+                <h2 className="font-display text-xl text-foreground">Новая заметка в ленту</h2>
+                <p className="text-xs text-muted-foreground">
+                  Попадает в события (не в поле «Комментарий» на вкладке «Основное»).
+                </p>
+              </div>
+              <Textarea
+                value={timelineNote}
+                onChange={(e) => setTimelineNote(e.target.value)}
+                className="min-h-[88px] border-hairline"
+                placeholder="Например: отправили оффер в Telegram…"
+              />
+              <Button type="button" onClick={handleAddTimelineNote} disabled={addingNote} variant="secondary">
+                {addingNote ? "Отправка…" : "Добавить в ленту"}
+              </Button>
+            </div>
+          )}
 
-      <div className="space-y-3">
-        <h2 className="font-display text-xl text-foreground">События и заметки</h2>
-        <p className="text-xs text-muted-foreground">
-          Сообщения бота, ручные заметки и прочая активность (до {CRM_HISTORY_FETCH_LIMIT} записей). Новее — выше.
-        </p>
-        {interactions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Пока нет событий.</p>
-        ) : (
-          <div className="space-y-2">
-            {interactions.map((item) => {
-              const noteBody = interactionBodyFromPayload(item.payload);
-              const extra =
-                noteBody ??
-                (Object.keys(item.payload).length === 0
-                  ? null
-                  : JSON.stringify(item.payload, null, 0).slice(0, 500));
-              return (
-                <div key={item.id} className="rounded-sm border border-hairline bg-surface/20 px-3 py-2">
-                  <p className="text-sm text-foreground">
-                    {item.interaction_type}
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {item.channel} · {item.direction}
-                    </span>
-                  </p>
-                  {extra ? <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">{extra}</p> : null}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {format(parseISO(item.created_at), "d MMM yyyy, HH:mm", { locale: ru })}
-                  </p>
-                </div>
-              );
-            })}
+          <div className="space-y-3">
+            <h2 className="font-display text-xl text-foreground">События и заметки</h2>
+            <p className="text-xs text-muted-foreground">
+              Бот, CRM, сайт и ручные заметки (до {CRM_HISTORY_FETCH_LIMIT} записей). Новее — выше.
+            </p>
+            {interactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Пока нет событий.</p>
+            ) : (
+              <div className="space-y-2">
+                {interactions.map((item) => {
+                  const noteBody = interactionBodyFromPayload(item.payload);
+                  const extra =
+                    noteBody ??
+                    (Object.keys(item.payload).length === 0
+                      ? null
+                      : JSON.stringify(item.payload, null, 0).slice(0, 500));
+                  return (
+                    <div key={item.id} className="rounded-sm border border-hairline bg-surface/20 px-3 py-2">
+                      <p className="text-sm text-foreground">
+                        {item.interaction_type}
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {item.channel} · {item.direction}
+                        </span>
+                      </p>
+                      {extra ? (
+                        <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">{extra}</p>
+                      ) : null}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {format(parseISO(item.created_at), "d MMM yyyy, HH:mm", { locale: ru })}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
