@@ -186,7 +186,6 @@ export default function CrmContactDetail() {
 
   /** Radix Select не допускает value="" и требует совпадения с SelectItem. */
   const stageCodes = useMemo(() => new Set((stages ?? []).map((s) => s.code)), [stages]);
-  const funnelSelectValue = stageCode && stageCodes.has(stageCode) ? stageCode : "__crm_stage_unresolved__";
 
   const [stageCode, setStageCode] = useState("");
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -212,6 +211,11 @@ export default function CrmContactDetail() {
   const [adminTelegramId, setAdminTelegramId] = useState("");
   const [adminIsDuplicate, setAdminIsDuplicate] = useState(false);
   const [adminConsent, setAdminConsent] = useState(false);
+
+  const funnelSelectValue = useMemo(
+    () => (stageCode && stageCodes.has(stageCode) ? stageCode : "__crm_stage_unresolved__"),
+    [stageCode, stageCodes],
+  );
 
   useEffect(() => {
     if (!contact) return;
