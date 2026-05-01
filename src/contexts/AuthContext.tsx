@@ -13,6 +13,8 @@ type AuthState = {
 
 type AuthContextValue = AuthState & {
   isStaff: boolean;
+  /** Admin в CRM — полное редактирование карточки и источников. */
+  isCrmAdmin: boolean;
   canWriteCrm: boolean;
   canEditSite: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -169,6 +171,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       loading,
       profileLoading,
       isStaff: Boolean(profile?.is_active && isStaffRole(r)),
+      isCrmAdmin: Boolean(profile?.is_active && r === "admin"),
       canWriteCrm: Boolean(profile?.is_active && canWriteRole(r)),
       canEditSite: Boolean(profile?.is_active && canWriteRole(r)),
       signIn,

@@ -9,6 +9,8 @@ export type CrmProfileRow = {
   updated_at?: string;
 };
 
+export type LeadTemperature = "cold" | "warm" | "hot";
+
 export type CrmContactRow = {
   id: string;
   full_name: string | null;
@@ -16,6 +18,16 @@ export type CrmContactRow = {
   email: string | null;
   telegram_id: number | null;
   source_channel: string;
+  source_detail?: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_content?: string | null;
+  utm_term?: string | null;
+  segment?: string | null;
+  lead_temperature?: LeadTemperature;
+  is_duplicate?: boolean;
+  consent_personal_data?: boolean;
   current_stage_id: string | null;
   owner_user_id: string | null;
   last_activity_at: string | null;
