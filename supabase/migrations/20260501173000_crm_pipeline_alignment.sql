@@ -1,5 +1,11 @@
 begin;
 
+-- sort_order глобально unique: при новой шкале возможны столкновения со старыми строками (например qualified=20 vs diagnostic_requested=20).
+-- Временно сдвигаем порядок, затем upsert выставляет целевые значения.
+update public.crm_pipeline_stages
+set sort_order = sort_order + 1000000
+where sort_order < 1000000;
+
 -- 1) Актуализируем этапы воронки под текущий процесс.
 insert into public.crm_pipeline_stages (code, name, sort_order, is_final, is_success, is_active)
 values
