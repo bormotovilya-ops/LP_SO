@@ -16,6 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { CrmContactRow, CrmPipelineStageRow, CrmProfileRow, LeadTemperature } from "@/types/crm";
+import {
+  CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL,
+  resolveCrmFunnelSelectValue,
+} from "@/lib/crmFunnelSelect";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -213,7 +217,7 @@ export default function CrmContactDetail() {
   const [adminConsent, setAdminConsent] = useState(false);
 
   const funnelSelectValue = useMemo(
-    () => (stageCode && stageCodes.has(stageCode) ? stageCode : "__crm_stage_unresolved__"),
+    () => resolveCrmFunnelSelectValue(stageCode, stageCodes),
     [stageCode, stageCodes],
   );
 
@@ -449,7 +453,7 @@ export default function CrmContactDetail() {
           <Select
             value={funnelSelectValue}
             onValueChange={(v) => {
-              if (v === "__crm_stage_unresolved__") return;
+              if (v === CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL) return;
               setStageCode(v);
             }}
             disabled={readOnly}
@@ -458,7 +462,7 @@ export default function CrmContactDetail() {
               <SelectValue placeholder="Этап" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__crm_stage_unresolved__" disabled className="text-muted-foreground">
+              <SelectItem value={CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL} disabled className="text-muted-foreground">
                 {stageCode ? "Этап не найден в справочнике — выберите новый" : "Выберите этап"}
               </SelectItem>
               {(stages ?? []).map((s) => (
