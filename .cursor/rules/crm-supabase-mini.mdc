@@ -8,5 +8,6 @@ alwaysApply: false
 
 - **Воронка** (`crm_pipeline_stages`): поле `sort_order` глобально уникально. При массовой перенумерации сначала сдвигайте старые значения большим офсетом, затем `INSERT … ON CONFLICT (code)`, иначе уникальный индекс по `sort_order` падает.
 - **Клиент**: не используйте `value=""` в Radix `Select`; задавайте сентинел и пункт списка, см. `resolveCrmFunnelSelectValue` в `src/lib/crmFunnelSelect.ts`.
+- **Контакты CRM**: сохранённые фильтры браузера — `localStorage`, ключ из `crmContactsFiltersStorage.ts` (`lp_so:crm-contacts:v1`).
 - **Порядок хуков**: не обращаться к состоянию (`useState`) выше строки его объявления (TDZ после минификации даёт runtime error).
 - **Миграции**: идемпотентность где возможно (`if not exists`); после изменений схемы прогоняйте `scripts/crm/04_integrity_checks.sql`.
