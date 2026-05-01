@@ -386,7 +386,7 @@ export default function CrmDashboard() {
 
   const total = metrics?.total_contacts ?? 0;
   const newInWeek = metrics?.new_contacts_last_7d ?? 0;
-  const stageKinds = (metrics.funnel ?? []).filter((s) => num(s.count) > 0).length;
+  const stageKinds = (metrics?.funnel ?? []).filter((s) => num(s.count) > 0).length;
 
   const isLoading = metricsLoading;
   const err = metricErr;
