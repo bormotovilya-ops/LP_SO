@@ -345,24 +345,13 @@ function TrendChartView({ variant, data }: { variant: TrendChartVariant; data: T
   );
 }
 
-export default function CrmDashboard() {
-  const supabase = getSupabase();
+/** Рендер только при валидном `metrics`, чтобы не читать поля у `null` до guard (и не ловить гонки на первом кадре). */
+function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
   const [funnelVariant, setFunnelVariant] = useState<FunnelChartVariant>("bar");
   const [trendVariant, setTrendVariant] = useState<TrendChartVariant>("line");
 
-  const { data: metricRaw, isLoading: metricsLoading, error: metricErr } = useQuery({
-    queryKey: ["crm", "dashboard-metrics"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("crm_dashboard_metrics");
-      if (error) throw error;
-      return data as unknown;
-    },
-  });
-
-  const metrics = useMemo(() => parseDashboardMetrics(metricRaw), [metricRaw]);
-
   const funnelData = useMemo<FunnelRow[]>(() => {
-    const f = metrics?.funnel ?? [];
+    const f = metrics.funnel;
     return [...f]
       .sort((a, b) => num(a.sort_order) - num(b.sort_order))
       .map((s) => ({
@@ -370,40 +359,24 @@ export default function CrmDashboard() {
         code: s.code,
         count: num(s.count),
       }));
-  }, [metrics?.funnel]);
+  }, [metrics.funnel]);
 
-  const trendData = useMemo(() => mapRpcTrendToChart(metrics?.new_per_day_utc_7d ?? []), [metrics?.new_per_day_utc_7d]);
+  const trendData = useMemo(() => mapRpcTrendToChart(metrics.new_per_day_utc_7d), [metrics.new_per_day_utc_7d]);
 
   const sourceBars = useMemo<FunnelRow[]>(() => {
-    const top = metrics?.top_source_channels ?? [];
+    const top = metrics.top_source_channels;
     return top.slice(0, 16).map((s) => ({
       name:
         (s.channel || "").length > 28 ? `${String(s.channel).slice(0, 26)}…` : String(s.channel || "—"),
       code: String(s.channel),
       count: num(s.count),
     }));
-  }, [metrics?.top_source_channels]);
+  }, [metrics.top_source_channels]);
 
-  const total = metrics?.total_contacts ?? 0;
-  const newInWeek = metrics?.new_contacts_last_7d ?? 0;
-  const stageKinds = (metrics?.funnel ?? []).filter((s) => num(s.count) > 0).length;
-
-  const isLoading = metricsLoading;
-  const err = metricErr;
-
-  const sla = metrics?.sla_first_activity;
-
-  if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Загрузка метрик…</p>;
-  }
-
-  if (err || !metrics) {
-    return (
-      <p className="text-sm text-destructive">
-        Ошибка загрузки: {err ? (err as Error).message : "пустой ответ"}
-      </p>
-    );
-  }
+  const total = metrics.total_contacts;
+  const newInWeek = metrics.new_contacts_last_7d;
+  const stageKinds = metrics.funnel.filter((s) => num(s.count) > 0).length;
+  const sla = metrics.sla_first_activity;
 
   return (
     <div className="space-y-8">
@@ -624,4 +597,42 @@ export default function CrmDashboard() {
       </Card>
     </div>
   );
+}
+
+export default function CrmDashboard() {
+  const supabase = getSupabase();
+
+  const { data: metricRaw, isLoading: metricsLoading, error: metricErr } = useQuery({
+    queryKey: ["crm", "dashboard-metrics"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("crm_dashboard_metrics");
+      if (error) throw error;
+      return data as unknown;
+    },
+  });
+
+  if (metricsLoading) {
+    return <p className="text-sm text-muted-foreground">Загрузка метрик…</p>;
+  }
+
+  if (metricErr) {
+    return (
+      <p className="text-sm text-destructive">
+        Ошибка загрузки: {(metricErr as Error).message}
+      </p>
+    );
+  }
+
+  const metrics = parseDashboardMetrics(metricRaw);
+  if (!metrics) {
+    return (
+      <p className="text-sm text-destructive">
+        Ошибка загрузки: пустой или неразборчивый ответ RPC <code className="text-xs">crm_dashboard_metrics</code>.
+        Убедитесь, что миграция <code className="text-xs">20260503120000_crm_list_page_and_dashboard_rpc.sql</code>{" "}
+        применена в Supabase.
+      </p>
+    );
+  }
+
+  return <CrmDashboardLoaded metrics={metrics} />;
 }
