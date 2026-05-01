@@ -58,14 +58,23 @@ const chartTooltipStyles = {
 
 const axisMuted = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
 
-function funnelPieCellOpacity(index: number, total: number): number {
-  if (total <= 1) return 1;
-  return 0.35 + ((index % 12) / 12) * 0.55;
+/** Цвета сегментов круговой диаграммы — только токены темы (видны на любой палитре [data-theme]). */
+const THEME_PIE_SEGMENT_FILLS = [
+  "hsl(var(--accent))",
+  "hsl(var(--accent-soft))",
+  "hsl(var(--secondary))",
+  "hsl(var(--surface))",
+  "hsl(var(--muted-foreground))",
+  "hsl(var(--hairline))",
+  "hsl(var(--destructive) / 0.88)",
+] as const;
+
+function pieFillForIndex(index: number): string {
+  return THEME_PIE_SEGMENT_FILLS[index % THEME_PIE_SEGMENT_FILLS.length]!;
 }
 
 function FunnelChartView({ variant, data }: { variant: FunnelChartVariant; data: FunnelRow[] }) {
   const accentStroke = "hsl(var(--accent))";
-  const accentFillMuted = "hsl(var(--accent) / 0.25)";
   const nonZeroPie = data.filter((d) => d.count > 0);
 
   if (variant === "barHorizontal") {
@@ -155,6 +164,7 @@ function FunnelChartView({ variant, data }: { variant: FunnelChartVariant; data:
 
   if (variant === "pie") {
     const pieRows = nonZeroPie.length ? nonZeroPie : [{ name: "Нет данных", code: "_", count: 1 }];
+    const emptyPlaceholder = !nonZeroPie.length;
     return (
       <ResponsiveContainer width="100%" height="100%">
         <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
@@ -167,12 +177,15 @@ function FunnelChartView({ variant, data }: { variant: FunnelChartVariant; data:
             innerRadius={28}
             outerRadius={92}
             paddingAngle={1}
+            stroke="hsl(var(--background))"
+            strokeWidth={2}
           >
             {pieRows.map((_, i) => (
               <Cell
                 key={pieRows[i].code}
-                fill={accentStroke}
-                fillOpacity={nonZeroPie.length ? funnelPieCellOpacity(i, pieRows.length) : 0.25}
+                fill={
+                  emptyPlaceholder ? "hsl(var(--muted) / 0.55)" : pieFillForIndex(i)
+                }
               />
             ))}
           </Pie>
