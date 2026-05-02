@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Area,
@@ -19,6 +19,14 @@ import {
 import { ChartArea, ChartColumn, ChartGantt, ChartLine, PieChart as PieChartIcon } from "lucide-react";
 import { getSupabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -31,7 +39,25 @@ type FunnelRow = { name: string; code: string; count: number };
 
 type TrendDatum = { label: string; count: number };
 
-type MixRowRpc = { code: string; label: string; count: number | string };
+const TASK_BY_ASSIGNEE_ALL = "__all__" as const;
+
+type TaskAssigneeBreakdownRpc = {
+  assignee_key: string;
+  label: string;
+  open: number | string;
+  in_progress: number | string;
+  done: number | string;
+  cancelled: number | string;
+};
+
+type TaskStatusCountKey = Exclude<keyof TaskAssigneeBreakdownRpc, "assignee_key" | "label">;
+
+const TASK_STATUS_CHART_ROWS: readonly { field: TaskStatusCountKey; label: string; code: string }[] = [
+  { field: "open", label: "Открыта", code: "open" },
+  { field: "in_progress", label: "В работе", code: "in_progress" },
+  { field: "done", label: "Завершена", code: "done" },
+  { field: "cancelled", label: "Отменена", code: "cancelled" },
+] as const;
 
 type DashboardMetrics = {
   total_contacts: number;
@@ -47,8 +73,7 @@ type DashboardMetrics = {
   tasks_total_all: number;
   tasks_active_open_progress: number;
   tasks_overdue_active: number;
-  task_status_mix: MixRowRpc[];
-  task_assignee_active_mix: MixRowRpc[];
+  task_breakdown_by_assignee: TaskAssigneeBreakdownRpc[];
   sla_first_activity: {
     cohort_with_activity: number | string;
     pct_within_24h: number | string | null;
@@ -110,11 +135,43 @@ function parseDashboardMetrics(raw: unknown): DashboardMetrics | null {
     tasks_total_all: num(o.tasks_total_all),
     tasks_active_open_progress: num(o.tasks_active_open_progress),
     tasks_overdue_active: num(o.tasks_overdue_active),
-    task_status_mix: Array.isArray(o.task_status_mix) ? (o.task_status_mix as MixRowRpc[]) : [],
-    task_assignee_active_mix: Array.isArray(o.task_assignee_active_mix)
-      ? (o.task_assignee_active_mix as MixRowRpc[])
+    task_breakdown_by_assignee: Array.isArray(o.task_breakdown_by_assignee)
+      ? (o.task_breakdown_by_assignee as TaskAssigneeBreakdownRpc[])
       : [],
   };
+}
+
+function taskBreakdownTotals(rows: TaskAssigneeBreakdownRpc[]): Record<TaskStatusCountKey, number> {
+  const z: Record<TaskStatusCountKey, number> = {
+    open: 0,
+    in_progress: 0,
+    done: 0,
+    cancelled: 0,
+  };
+  for (const r of rows) {
+    z.open += num(r.open);
+    z.in_progress += num(r.in_progress);
+    z.done += num(r.done);
+    z.cancelled += num(r.cancelled);
+  }
+  return z;
+}
+
+function rowToStatusTotals(r: TaskAssigneeBreakdownRpc): Record<TaskStatusCountKey, number> {
+  return {
+    open: num(r.open),
+    in_progress: num(r.in_progress),
+    done: num(r.done),
+    cancelled: num(r.cancelled),
+  };
+}
+
+function taskCountsToFunnelBars(totals: Record<TaskStatusCountKey, number>): FunnelRow[] {
+  return TASK_STATUS_CHART_ROWS.map((row) => ({
+    name: row.label,
+    code: row.code,
+    count: totals[row.field],
+  }));
 }
 
 function mapRpcTrendToChart(rows: DashboardMetrics["new_per_day_utc_7d"]): TrendDatum[] {
@@ -155,7 +212,16 @@ function pieFillForIndex(index: number): string {
   return THEME_PIE_SEGMENT_FILLS[index % THEME_PIE_SEGMENT_FILLS.length]!;
 }
 
-function FunnelChartView({ variant, data }: { variant: FunnelChartVariant; data: FunnelRow[] }) {
+function FunnelChartView({
+  variant,
+  data,
+  countLabel = "Лидов",
+}: {
+  variant: FunnelChartVariant;
+  data: FunnelRow[];
+  /** Подпись в столбце/туултипе («Лидов», «Задач» и т.д.). */
+  countLabel?: string;
+}) {
   const accentStroke = "hsl(var(--accent))";
   const nonZeroPie = data.filter((d) => d.count > 0);
 
@@ -175,8 +241,8 @@ function FunnelChartView({ variant, data }: { variant: FunnelChartVariant; data:
             width={108}
             tick={{ ...axisMuted, fontSize: 9 }}
           />
-          <Tooltip contentStyle={chartTooltipStyles} formatter={(v: number) => [`${v}`, "Лидов"]} />
-          <Bar dataKey="count" fill={accentStroke} radius={[0, 2, 2, 0]} name="Лидов" />
+          <Tooltip contentStyle={chartTooltipStyles} formatter={(v: number) => [`${v}`, countLabel]} />
+          <Bar dataKey="count" fill={accentStroke} radius={[0, 2, 2, 0]} name={countLabel} />
         </BarChart>
       </ResponsiveContainer>
     );
@@ -228,8 +294,8 @@ function FunnelChartView({ variant, data }: { variant: FunnelChartVariant; data:
           height={64}
         />
         <YAxis allowDecimals={false} tick={axisMuted} />
-        <Tooltip contentStyle={chartTooltipStyles} />
-        <Bar dataKey="count" fill={accentStroke} radius={[2, 2, 0, 0]} name="Лидов" />
+        <Tooltip contentStyle={chartTooltipStyles} formatter={(v: number) => [`${v}`, countLabel]} />
+        <Bar dataKey="count" fill={accentStroke} radius={[2, 2, 0, 0]} name={countLabel} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -297,6 +363,7 @@ function TrendChartView({ variant, data }: { variant: TrendChartVariant; data: T
 function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
   const [funnelVariant, setFunnelVariant] = useState<FunnelChartVariant>("bar");
   const [trendVariant, setTrendVariant] = useState<TrendChartVariant>("line");
+  const [taskAssigneeKey, setTaskAssigneeKey] = useState<string>(TASK_BY_ASSIGNEE_ALL);
 
   const funnelData = useMemo<FunnelRow[]>(() => {
     const f = metrics.funnel;
@@ -321,24 +388,35 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
     }));
   }, [metrics.top_source_channels]);
 
-  const taskStatusBars = useMemo<FunnelRow[]>(
-    () =>
-      metrics.task_status_mix.map((r) => ({
-        name: r.label || r.code,
-        code: r.code,
-        count: num(r.count),
-      })),
-    [metrics.task_status_mix],
-  );
+  const taskBreakdown = metrics.task_breakdown_by_assignee;
 
-  const taskAssigneeBars = useMemo<FunnelRow[]>(
-    () =>
-      metrics.task_assignee_active_mix.map((r) => ({
-        name: r.label || r.code,
-        code: r.code,
-        count: num(r.count),
-      })),
-    [metrics.task_assignee_active_mix],
+  useEffect(() => {
+    if (taskAssigneeKey === TASK_BY_ASSIGNEE_ALL) return;
+    const ok = taskBreakdown.some((r) => r.assignee_key === taskAssigneeKey);
+    if (!ok) {
+      setTaskAssigneeKey(TASK_BY_ASSIGNEE_ALL);
+    }
+  }, [taskAssigneeKey, taskBreakdown]);
+
+  const selectedAssigneeSummary = useMemo(() => {
+    if (taskAssigneeKey === TASK_BY_ASSIGNEE_ALL) {
+      return { label: "Все ответственные", key: TASK_BY_ASSIGNEE_ALL as string };
+    }
+    const hit = taskBreakdown.find((r) => r.assignee_key === taskAssigneeKey);
+    return { label: hit?.label ?? taskAssigneeKey, key: taskAssigneeKey };
+  }, [taskAssigneeKey, taskBreakdown]);
+
+  const taskStatusTotalsSelected = useMemo((): Record<TaskStatusCountKey, number> => {
+    if (taskAssigneeKey === TASK_BY_ASSIGNEE_ALL) {
+      return taskBreakdownTotals(taskBreakdown);
+    }
+    const row = taskBreakdown.find((r) => r.assignee_key === taskAssigneeKey);
+    return row ? rowToStatusTotals(row) : { open: 0, in_progress: 0, done: 0, cancelled: 0 };
+  }, [taskAssigneeKey, taskBreakdown]);
+
+  const taskChartBars = useMemo(
+    () => taskCountsToFunnelBars(taskStatusTotalsSelected),
+    [taskStatusTotalsSelected],
   );
 
   const total = metrics.total_contacts;
@@ -492,51 +570,57 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
         </Card>
 
         <Card className="border-hairline bg-surface/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="font-display text-lg">Задачи по статусам и ответственным</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Всего записей в задачах: <span className="tabular-nums text-foreground">{metrics.tasks_total_all}</span>.
-              Активных (открыта или в работе):{" "}
-              <span className="tabular-nums text-foreground">{metrics.tasks_active_open_progress}</span>
-              ; с просроченным сроком среди активных:{" "}
-              <span className="tabular-nums text-foreground">{metrics.tasks_overdue_active}</span>.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-6 pb-6">
+          <CardHeader className="space-y-3 pb-4">
             <div>
-              <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">По статусу</p>
-              <div className="h-[220px] pl-0">
-                {metrics.task_status_mix.length > 0 ? (
-                  <FunnelChartView variant="barHorizontal" data={taskStatusBars} />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Нет блока задач в ответе RPC — примените миграцию{" "}
-                    <code className="rounded bg-muted px-1 py-px text-[11px]">
-                      20260507130000_crm_dashboard_task_mix
-                    </code>
-                    .
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="border-hairline border-t pt-4">
-              <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                Активные по ответственному (имя из CRM-профиля)
+              <CardTitle className="font-display text-lg">Задачи по статусам</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Всего в CRM: <span className="tabular-nums text-foreground">{metrics.tasks_total_all}</span> · активных
+                (открыта или в работе):{" "}
+                <span className="tabular-nums text-foreground">{metrics.tasks_active_open_progress}</span>
+                · с просроком среди них:{" "}
+                <span className="tabular-nums text-foreground">{metrics.tasks_overdue_active}</span>.
               </p>
-              <div className="h-[220px] pl-0">
-                {metrics.task_status_mix.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    См. миграцию в блоке «По статусу» выше.
-                  </p>
-                ) : metrics.tasks_active_open_progress <= 0 ? (
-                  <p className="text-sm text-muted-foreground">Нет задач со статусом «открыта» или «в работе».</p>
-                ) : metrics.task_assignee_active_mix.length > 0 ? (
-                  <FunnelChartView variant="barHorizontal" data={taskAssigneeBars} />
-                ) : (
-                  <p className="text-sm text-muted-foreground">Нет данных по ответственным.</p>
-                )}
-              </div>
             </div>
+            <div className="space-y-2">
+              <Label
+                htmlFor="dash-task-assignee"
+                className="text-[10px] uppercase tracking-wider text-muted-foreground"
+              >
+                Ответственный
+              </Label>
+              <Select value={taskAssigneeKey} onValueChange={(v) => setTaskAssigneeKey(v)}>
+                <SelectTrigger id="dash-task-assignee" className="max-w-md border-hairline">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TASK_BY_ASSIGNEE_ALL}>Все ответственные</SelectItem>
+                  {taskBreakdown.map((row) => (
+                    <SelectItem key={row.assignee_key} value={row.assignee_key}>
+                      {row.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Столбцы — статусы задач именно для:{" "}
+                <span className="font-medium text-foreground">{selectedAssigneeSummary.label}</span>.
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="h-[300px] pl-0 pb-6 pt-0">
+            {taskBreakdown.length === 0 && metrics.tasks_total_all > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Сервер без разбивки по ответственным — выполните миграцию{" "}
+                <code className="rounded bg-muted px-1 py-px text-[11px]">
+                  20260507140000_crm_dashboard_task_by_assignee_status
+                </code>
+                .
+              </p>
+            ) : metrics.tasks_total_all <= 0 ? (
+              <p className="text-sm text-muted-foreground">Задач в CRM пока нет.</p>
+            ) : (
+              <FunnelChartView variant="bar" data={taskChartBars} countLabel="Задач" />
+            )}
           </CardContent>
         </Card>
       </div>
