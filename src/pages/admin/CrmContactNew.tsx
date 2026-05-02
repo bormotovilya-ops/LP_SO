@@ -9,6 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CRM_LEAD_SOURCES, type CrmLeadSourceCode } from "@/lib/crmLeadSources";
 
 function toRpcString(raw: string): string | null {
   const t = raw.trim();
@@ -42,6 +50,7 @@ export default function CrmContactNew() {
   const [sourceDetail, setSourceDetail] = useState("");
   const [assignToMe, setAssignToMe] = useState(true);
   const [consent, setConsent] = useState(false);
+  const [sourceChannel, setSourceChannel] = useState<CrmLeadSourceCode>("crm");
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -61,7 +70,7 @@ export default function CrmContactNew() {
         p_phone: toRpcString(phone),
         p_email: toRpcString(email),
         p_telegram_id: tgNum,
-        p_source_channel: "crm_manual",
+        p_source_channel: sourceChannel,
         p_source_detail: toRpcString(sourceDetail),
         p_utm_source: null,
         p_utm_medium: null,
@@ -119,8 +128,7 @@ export default function CrmContactNew() {
         </Link>
         <h1 className="mt-2 font-display text-3xl text-foreground">Новый контакт</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ручной лид из CRM (`crm_manual`): этап по умолчанию — новый лид. Дубликаты схлопываются по телефону, email или
-          Telegram.
+          Этап по умолчанию — новый лид. Дубликаты схлопываются по телефону, email или Telegram.
         </p>
       </div>
 
@@ -147,6 +155,21 @@ export default function CrmContactNew() {
         <div className="space-y-2">
           <Label>Telegram ID</Label>
           <Input value={telegramId} onChange={(e) => setTelegramId(e.target.value)} className="border-hairline" />
+        </div>
+        <div className="space-y-2">
+          <Label>Источник лида</Label>
+          <Select value={sourceChannel} onValueChange={(v) => setSourceChannel(v as CrmLeadSourceCode)}>
+            <SelectTrigger className="border-hairline">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CRM_LEAD_SOURCES.map(({ code, label }) => (
+                <SelectItem key={code} value={code}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label>Деталь источника (необязательно)</Label>

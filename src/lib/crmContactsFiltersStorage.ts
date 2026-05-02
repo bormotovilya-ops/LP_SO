@@ -1,8 +1,9 @@
 import type { LeadTemperature } from "@/types/crm";
+import { CRM_LEAD_SOURCES, type CrmLeadSourceCode } from "@/lib/crmLeadSources";
 
 export const CRM_CONTACTS_FILTERS_LS_KEY = "lp_so:crm-contacts:v1";
 
-export type QuickSourcePreset = "all" | "site" | "telegram" | "unknown";
+export type QuickSourcePreset = "all" | CrmLeadSourceCode;
 export type DuplicateFilter = "any" | "only" | "hide";
 /** Фильтр по ответственному на списке контактов. */
 export type CrmContactsOwnerFilter = "any" | "mine" | "unassigned";
@@ -73,9 +74,10 @@ export function summarizeCrmFilters(s: Omit<CrmContactsFiltersPersist, "v">): st
 
   if (s.exactChannel !== ANY && s.exactChannel) {
     parts.push(`канал: ${s.exactChannel}`);
-  } else if (s.quickSource === "site") parts.push("с сайта");
-  else if (s.quickSource === "telegram") parts.push("Telegram");
-  else if (s.quickSource === "unknown") parts.push("источник неизвестен");
+  } else if (s.quickSource !== "all") {
+    const hit = CRM_LEAD_SOURCES.find((x) => x.code === s.quickSource);
+    parts.push(hit ? `источник: ${hit.label}` : `источник: ${s.quickSource}`);
+  }
 
   if (s.stageId !== ANY && s.stageId) parts.push("этап выбран");
   if (s.temperatureFilter !== ANY) parts.push(`темп.: ${s.temperatureFilter}`);

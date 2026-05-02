@@ -8,7 +8,7 @@ contact_one as (
     p_full_name := 'Тестовый клиент 1',
     p_phone := '+7 (999) 111-22-33',
     p_email := 'lead1@example.com',
-    p_source_channel := 'site_quiz',
+    p_source_channel := 'site',
     p_source_detail := 'quiz_landing',
     p_utm_source := 'instagram',
     p_utm_medium := 'cpc',
@@ -22,7 +22,7 @@ contact_two as (
   select (public.crm_upsert_contact(
     p_full_name := 'Тестовый клиент 2',
     p_phone := '+7 (999) 444-55-66',
-    p_source_channel := 'telegram_bot',
+    p_source_channel := 'bot',
     p_source_detail := 'start_payload',
     p_segment := 'present',
     p_owner_user_id := (select id from manager_profile),

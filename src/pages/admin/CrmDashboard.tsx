@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChartArea, ChartColumn, ChartGantt, ChartLine, CircleDashed } from "lucide-react";
+import { ChartArea, ChartColumn, ChartGantt, ChartLine, PieChart as PieChartIcon } from "lucide-react";
 import { getSupabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -24,7 +24,7 @@ import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-type FunnelChartVariant = "bar" | "barHorizontal" | "line" | "area" | "pie";
+type FunnelChartVariant = "bar" | "barHorizontal" | "pie";
 
 type TrendChartVariant = "line" | "bar" | "area";
 
@@ -175,68 +175,6 @@ function FunnelChartView({ variant, data }: { variant: FunnelChartVariant; data:
           <Tooltip contentStyle={chartTooltipStyles} formatter={(v: number) => [`${v}`, "Лидов"]} />
           <Bar dataKey="count" fill={accentStroke} radius={[0, 2, 2, 0]} name="Лидов" />
         </BarChart>
-      </ResponsiveContainer>
-    );
-  }
-
-  if (variant === "line") {
-    return (
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 32 }}>
-          <CartesianGrid stroke="hsl(var(--hairline))" vertical={false} />
-          <XAxis
-            dataKey="name"
-            tick={axisMuted}
-            interval={0}
-            angle={-18}
-            textAnchor="end"
-            height={64}
-          />
-          <YAxis allowDecimals={false} tick={axisMuted} />
-          <Tooltip contentStyle={chartTooltipStyles} />
-          <Line
-            type="monotone"
-            dataKey="count"
-            stroke={accentStroke}
-            strokeWidth={2}
-            dot={{ r: 2, fill: accentStroke }}
-            name="Лидов"
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    );
-  }
-
-  if (variant === "area") {
-    return (
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 32 }}>
-          <CartesianGrid stroke="hsl(var(--hairline))" vertical={false} />
-          <defs>
-            <linearGradient id="funnelAreaFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={accentStroke} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={accentStroke} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <XAxis
-            dataKey="name"
-            tick={axisMuted}
-            interval={0}
-            angle={-18}
-            textAnchor="end"
-            height={64}
-          />
-          <YAxis allowDecimals={false} tick={axisMuted} />
-          <Tooltip contentStyle={chartTooltipStyles} />
-          <Area
-            type="monotone"
-            dataKey="count"
-            stroke={accentStroke}
-            strokeWidth={2}
-            fill="url(#funnelAreaFill)"
-            name="Лидов"
-          />
-        </AreaChart>
       </ResponsiveContainer>
     );
   }
@@ -459,20 +397,14 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
                 className="flex-wrap justify-start rounded-md bg-muted/50 p-1"
                 aria-label="Тип диаграммы по этапам"
               >
-                <ToggleGroupItem value="bar" aria-label="Столбцы" className="h-9 shrink-0 px-2.5">
+                <ToggleGroupItem value="bar" aria-label="Столбиковая" className="h-9 shrink-0 px-2.5">
                   <ChartColumn className="h-4 w-4" />
                 </ToggleGroupItem>
-                <ToggleGroupItem value="barHorizontal" aria-label="Горизонтально" className="h-9 shrink-0 px-2.5">
+                <ToggleGroupItem value="barHorizontal" aria-label="Рейтинговая" className="h-9 shrink-0 px-2.5">
                   <ChartGantt className="h-4 w-4" />
                 </ToggleGroupItem>
-                <ToggleGroupItem value="line" aria-label="Линия" className="h-9 shrink-0 px-2.5">
-                  <ChartLine className="h-4 w-4" />
-                </ToggleGroupItem>
-                <ToggleGroupItem value="area" aria-label="Область" className="h-9 shrink-0 px-2.5">
-                  <ChartArea className="h-4 w-4" />
-                </ToggleGroupItem>
-                <ToggleGroupItem value="pie" aria-label="Кольцевая долями" className="h-9 shrink-0 px-2.5">
-                  <CircleDashed className="h-4 w-4" />
+                <ToggleGroupItem value="pie" aria-label="Круговая" className="h-9 shrink-0 px-2.5">
+                  <PieChartIcon className="h-4 w-4" />
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
@@ -523,7 +455,7 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
           <CardHeader>
             <CardTitle className="font-display text-lg">Лиды по каналам (источники)</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Уникальных значений source_channel (до 16 на экране, полный топ в данных).
+              Семь фиксированных источников (агрегация по `source_channel`).
             </p>
           </CardHeader>
           <CardContent className="h-[280px] pl-0 pt-2">

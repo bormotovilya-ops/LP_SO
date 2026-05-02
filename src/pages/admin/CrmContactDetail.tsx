@@ -29,6 +29,7 @@ import {
   CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL,
   resolveCrmFunnelSelectValue,
 } from "@/lib/crmFunnelSelect";
+import { CRM_LEAD_SOURCES, crmLeadSourceLabel, normalizeCrmLeadSourceCode } from "@/lib/crmLeadSources";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -274,7 +275,7 @@ export default function CrmContactDetail() {
     setAdminUtmContent(contact.utm_content ?? "");
     setAdminUtmTerm(contact.utm_term ?? "");
     setAdminSegment(contact.segment ?? "");
-    setAdminSourceChannel(contact.source_channel ?? "");
+    setAdminSourceChannel(normalizeCrmLeadSourceCode(contact.source_channel));
     setAdminLeadTemperature((contact.lead_temperature as LeadTemperature) ?? "cold");
     setAdminTelegramId(contact.telegram_id != null ? String(contact.telegram_id) : "");
     setAdminIsDuplicate(contact.is_duplicate ?? false);
@@ -323,7 +324,7 @@ export default function CrmContactDetail() {
 
       const adminPayload = isCrmAdmin
         ? {
-            source_channel: adminSourceChannel.trim() || contact.source_channel,
+            source_channel: adminSourceChannel.trim() || normalizeCrmLeadSourceCode(contact.source_channel),
             source_detail: adminSourceDetail.trim() || null,
             utm_source: adminUtmSource.trim() || null,
             utm_medium: adminUtmMedium.trim() || null,
@@ -496,7 +497,8 @@ export default function CrmContactDetail() {
           Создан: {format(parseISO(contact.created_at), "d MMM yyyy, HH:mm", { locale: ru })}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Источник: {contact.source_channel || "—"} {contact.telegram_id ? `· Telegram ID: ${contact.telegram_id}` : ""}
+          Источник: {crmLeadSourceLabel(contact.source_channel)}
+          {contact.telegram_id ? ` · Telegram ID: ${contact.telegram_id}` : ""}
         </p>
       </div>
 
@@ -659,13 +661,23 @@ export default function CrmContactDetail() {
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Канал источника (source_channel)</Label>
-                  <Input
+                  <Label>Источник лида</Label>
+                  <Select
                     value={adminSourceChannel}
-                    onChange={(e) => setAdminSourceChannel(e.target.value)}
-                    className="border-hairline"
+                    onValueChange={(v) => setAdminSourceChannel(v)}
                     disabled={readOnly}
-                  />
+                  >
+                    <SelectTrigger className="border-hairline">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CRM_LEAD_SOURCES.map(({ code, label }) => (
+                        <SelectItem key={code} value={code}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Детализация источника</Label>

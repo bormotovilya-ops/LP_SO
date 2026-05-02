@@ -32,14 +32,30 @@ import {
   saveCrmContactsFilters,
   summarizeCrmFilters,
 } from "@/lib/crmContactsFiltersStorage";
+import { CRM_LEAD_SOURCES, type CrmLeadSourceCode, crmLeadSourceLabel } from "@/lib/crmLeadSources";
 import { format, parseISO, startOfDay, endOfDay } from "date-fns";
 import { ru } from "date-fns/locale";
 
+type ContactsMetaQuickCounts = {
+  all: number;
+  crm: number;
+  bot: number;
+  site: number;
+  channel: number;
+  vk: number;
+  instagram: number;
+  other: number;
+};
+
 type ContactsMetaPayload = {
-  quick_counts?: { all: number; site: number; telegram: number; unknown: number };
+  quick_counts?: Partial<ContactsMetaQuickCounts>;
   channels?: unknown;
   segments?: unknown;
 };
+
+function isCrmLeadSourceCode(x: string): x is CrmLeadSourceCode {
+  return CRM_LEAD_SOURCES.some((s) => s.code === x);
+}
 
 type ContactsPageRpcRow = Record<string, unknown>;
 
@@ -71,14 +87,11 @@ function readStoredState() {
   }
 
   let qs: QuickSourcePreset = "all";
-  if (
-    s?.quickSource === "site" ||
-    s?.quickSource === "telegram" ||
-    s?.quickSource === "unknown" ||
-    s?.quickSource === "all"
-  ) {
-    qs = s.quickSource;
-  }
+  const rawQs = typeof s?.quickSource === "string" ? s.quickSource : null;
+  if (rawQs === "telegram") qs = "bot";
+  else if (rawQs === "unknown") qs = "other";
+  else if (rawQs === "all") qs = "all";
+  else if (rawQs && isCrmLeadSourceCode(rawQs)) qs = rawQs;
 
   let ownerFilter: CrmContactsOwnerFilter = "any";
   if (s?.ownerFilter === "mine" || s?.ownerFilter === "unassigned" || s?.ownerFilter === "any") {
@@ -340,17 +353,17 @@ export default function CrmContacts() {
     return m;
   }, [stages]);
 
-  const quickCounts = {
-    all: contactsMetaPayload?.quick_counts?.all ?? 0,
-    site: contactsMetaPayload?.quick_counts?.site ?? 0,
-    telegramN: contactsMetaPayload?.quick_counts?.telegram ?? 0,
-    unknown: contactsMetaPayload?.quick_counts?.unknown ?? 0,
+  const qc = contactsMetaPayload?.quick_counts;
+  const quickCounts: ContactsMetaQuickCounts = {
+    all: qc?.all ?? 0,
+    crm: qc?.crm ?? 0,
+    bot: qc?.bot ?? 0,
+    site: qc?.site ?? 0,
+    channel: qc?.channel ?? 0,
+    vk: qc?.vk ?? 0,
+    instagram: qc?.instagram ?? 0,
+    other: qc?.other ?? 0,
   };
-
-  const distinctChannels = useMemo(
-    () => coerceStringArray(contactsMetaPayload?.channels),
-    [contactsMetaPayload?.channels],
-  );
 
   const distinctSegments = useMemo(
     () => coerceStringArray(contactsMetaPayload?.segments),
@@ -505,13 +518,16 @@ export default function CrmContacts() {
                   Источник
                 </span>
                 {(
-                  [
-                    { id: "all" as const, label: "Все", count: quickCounts.all },
-                    { id: "site" as const, label: "С сайта", count: quickCounts.site },
-                    { id: "telegram" as const, label: "Telegram / бот", count: quickCounts.telegramN },
-                    { id: "unknown" as const, label: "Канал неизвестен", count: quickCounts.unknown },
-                  ] as const
-                ).map((opt) => (
+                  [{ id: "all" as const, label: "Все", count: quickCounts.all }] as const
+                )
+                  .concat(
+                    CRM_LEAD_SOURCES.map((src) => ({
+                      id: src.code,
+                      label: src.label,
+                      count: quickCounts[src.code],
+                    })),
+                  )
+                  .map((opt) => (
                   <button
                     key={opt.id}
                     type="button"
@@ -545,9 +561,9 @@ export default function CrmContacts() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={ANY_VALUE}>Все каналы</SelectItem>
-                      {distinctChannels.map((ch) => (
-                        <SelectItem key={ch} value={ch}>
-                          {ch}
+                      {CRM_LEAD_SOURCES.map(({ code, label }) => (
+                        <SelectItem key={code} value={code}>
+                          {label} ({code})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -792,7 +808,7 @@ export default function CrmContacts() {
                   <TableCell className="text-muted-foreground">{c.phone || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{c.email || "—"}</TableCell>
                   <TableCell className="text-sm">
-                    <span className="text-foreground">{c.source_channel}</span>
+                    <span className="text-foreground">{crmLeadSourceLabel(c.source_channel)}</span>
                     {c.source_detail ? (
                       <span className="ml-1 text-xs text-muted-foreground">· {c.source_detail}</span>
                     ) : null}

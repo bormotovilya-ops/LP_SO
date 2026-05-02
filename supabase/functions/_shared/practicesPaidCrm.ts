@@ -19,7 +19,7 @@ export async function recordPracticesPaidCrm(sb: SupabaseClient, orderId: string
     p_phone: null,
     p_email: email,
     p_telegram_id: null,
-    p_source_channel: "site_payment",
+    p_source_channel: "site",
     p_source_detail: "practices_debt_freedom",
     p_utm_source: null,
     p_utm_medium: null,

@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
         p_phone: normalizedContact || null,
         p_email: null,
         p_telegram_id: null,
-        p_source_channel: "site_form",
+        p_source_channel: "site",
         p_source_detail: crmEventType || "diagnostic_request_submitted",
         p_utm_source: null,
         p_utm_medium: null,
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
       if (contactId) {
         await supabase.rpc("crm_add_interaction", {
           p_contact_id: contactId,
-          p_channel: "site_form",
+          p_channel: "site",
           p_direction: "inbound",
           p_interaction_type: crmEventType || "diagnostic_request_submitted",
           p_payload: {

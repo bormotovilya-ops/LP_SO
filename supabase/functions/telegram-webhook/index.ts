@@ -330,7 +330,7 @@ async function savePracticesCollectionTelegramCrm(
     p_phone: null,
     p_email: null,
     p_telegram_id: telegramId,
-    p_source_channel: "telegram_bot",
+    p_source_channel: "bot",
     p_source_detail: "practices_collection_delivery",
     p_utm_source: null,
     p_utm_medium: null,
@@ -500,7 +500,7 @@ async function saveCrmBotEvent(
   await client.rpc("crm_upsert_contact", {
     p_full_name: fullName || null,
     p_telegram_id: telegramId,
-    p_source_channel: "telegram_bot",
+    p_source_channel: "bot",
     p_source_detail: "telegram-webhook",
     p_segment: giftTrack ?? null,
     p_comment: "Создано/обновлено из telegram-webhook",

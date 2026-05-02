@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     p_phone: toNullableString(body.phone),
     p_email: toNullableString(body.email),
     p_telegram_id: toNullableBigint(body.telegramId),
-    p_source_channel: "telegram_bot",
+    p_source_channel: "bot",
     p_source_detail: toNullableString(body.sourceDetail) ?? "bot_event",
     p_comment: null,
   });
