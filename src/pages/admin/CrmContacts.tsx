@@ -484,7 +484,7 @@ export default function CrmContacts() {
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <span className="text-xs text-muted-foreground">
-                Всего в списке: <span className="tabular-nums text-foreground">{allContacts.length}</span>
+                Всего в списке: <span className="tabular-nums text-foreground">{totalFiltered}</span>
               </span>
               {hasActiveFilters ? (
                 <button

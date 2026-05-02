@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Footer } from "@/components/landing/Footer";
@@ -99,6 +99,9 @@ async function notifyPracticesCollectionLandingChannel(orderIdHint?: string | nu
 const PracticesCollectionDebtFreedom = () => {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const paidCtaAnchorRef = useRef<HTMLDivElement | null>(null);
+  /** Инкремент при каждом `?pay=ok`, чтобы прокрутить даже если `practicesPaid` уже был true. */
+  const [scrollAfterPaySeq, setScrollAfterPaySeq] = useState(0);
   const [practicesPaid, setPracticesPaidState] = useState(() =>
     typeof window !== "undefined" ? Boolean(getPracticesPaid()) : false,
   );
@@ -120,6 +123,7 @@ const PracticesCollectionDebtFreedom = () => {
     const pay = searchParams.get("pay");
 
     if (pay === "ok") {
+      setScrollAfterPaySeq((n) => n + 1);
       const oid = searchParams.get("oid")?.trim();
       const uuidRe =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -168,6 +172,14 @@ const PracticesCollectionDebtFreedom = () => {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  useEffect(() => {
+    if (scrollAfterPaySeq === 0) return;
+    const t = window.setTimeout(() => {
+      paidCtaAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [scrollAfterPaySeq]);
 
   return (
     <main className="relative min-h-screen bg-background text-foreground">
@@ -233,7 +245,10 @@ const PracticesCollectionDebtFreedom = () => {
           </div>
 
           {practicesPaid && (
-            <div className="mb-10 flex flex-col items-start gap-4 border border-hairline bg-surface/40 p-6">
+            <div
+              ref={paidCtaAnchorRef}
+              className="mb-10 flex scroll-mt-24 flex-col items-start gap-4 border border-hairline bg-surface/40 p-6"
+            >
               <p className="text-sm font-medium leading-relaxed text-accent">
                 Спасибо за оплату. Откройте бота — доступ к сборнику откроется в чате с ботом.
               </p>
