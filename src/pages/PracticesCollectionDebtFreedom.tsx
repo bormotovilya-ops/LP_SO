@@ -119,8 +119,7 @@ const PracticesCollectionDebtFreedom = () => {
       setSearchParams(next, { replace: true });
       toast({
         title: "Оплата прошла",
-        description:
-          "Откройте бота ниже — материалы придут из канала, как поларки. На стороне Точки в ссылке возврата должен быть параметр pay=ok.",
+        description: "Откройте бота ниже — доступ к сборнику там откроется.",
       });
       notifyPracticesCollectionLandingChannel().catch(() => {});
       return;
@@ -219,8 +218,7 @@ const PracticesCollectionDebtFreedom = () => {
           {practicesPaid && (
             <div className="mb-10 flex flex-col items-start gap-4 border border-hairline bg-surface/40 p-6">
               <p className="text-sm font-medium leading-relaxed text-accent">
-                Спасибо за оплату. Откройте бота — файл сборника отправится из закрытого канала тем же способом, что и
-                поларки.
+                Спасибо за оплату. Откройте бота — доступ к сборнику откроется в чате с ботом.
               </p>
               <a
                 href={practicesBotHref}
