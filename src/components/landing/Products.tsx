@@ -46,7 +46,7 @@ const PRODUCTS: Product[] = [
     tag: "Самостоятельно",
     title: "Сборники практик",
     desc: "Авторские техники и мини-курсы. Вход в работу без длительных обязательств — для тех, кто хочет начать сам.",
-    price: "от 5 ₽ (тест)",
+    price: "4 990 ₽",
     priceNote: "Цифровые продукты",
     href: "/practices/svoboda-ot-dolgov",
     collections: [

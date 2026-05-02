@@ -2,8 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 const INIT_PROD = "https://securepay.tinkoff.ru/v2/Init";
 const INIT_TEST = "https://rest-api-test.tinkoff.ru/v2/Init";
-// Temporary test price: 5 RUB.
-const AMOUNT_KOPECKS = 500;
+// Сборник практик: 4 990 RUB (коп.).
+const AMOUNT_KOPECKS = 499_000;
 const RECEIPT_ITEM_NAME = "Сборники практик (цифровой продукт)";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

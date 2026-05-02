@@ -13,7 +13,9 @@ import portraitImage from "../../old/фото-16.jpg";
 
 /** Платёжная страница Точки (каталог). Переопределение: VITE_TOCHKA_CHECKOUT_URL в .env / Variables сборки */
 const DEFAULT_TOCHKA_CHECKOUT_URL =
-  "https://checkout.tochka.com/30e41ac2-c228-4470-a12c-482732cf8b63";
+  "https://checkout.tochka.com/bc380cff-5068-49b3-a450-73b2e54d7684";
+
+const PRACTICES_PRICE_LABEL = "4 990 ₽";
 
 const checkoutButtonClasses =
   "inline-flex items-center justify-center border border-accent bg-background/85 px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground";
@@ -197,7 +199,7 @@ const PracticesCollectionDebtFreedom = () => {
       <section className="py-16 md:py-20">
         <div className="container-luxe">
           <div className="mb-8 flex flex-wrap items-center gap-4 border border-accent/30 bg-[linear-gradient(115deg,hsl(var(--accent)/0.12),hsl(var(--background))_60%)] px-6 py-5 shadow-[0_16px_42px_-34px_hsl(var(--accent)/0.55)]">
-            <span className="font-display text-3xl text-accent">5 ₽</span>
+            <span className="font-display text-3xl text-accent">{PRACTICES_PRICE_LABEL}</span>
             <div className="min-w-0 flex-1">
               <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
                 Разовый доступ к сборнику
@@ -211,7 +213,7 @@ const PracticesCollectionDebtFreedom = () => {
               href={tochkaCheckoutUrl}
               className={`${checkoutButtonClasses} ml-auto shrink-0`}
             >
-              Оплатить 5 ₽
+              Оплатить {PRACTICES_PRICE_LABEL}
             </a>
           </div>
           {practicesPaid && (
@@ -306,7 +308,7 @@ const PracticesCollectionDebtFreedom = () => {
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <a href={tochkaCheckoutUrl} className={checkoutButtonClassesSecondary}>
-                Перейти к оплате 5 ₽
+                Перейти к оплате {PRACTICES_PRICE_LABEL}
               </a>
               <Link
                 to="/#products"
