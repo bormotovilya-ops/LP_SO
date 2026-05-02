@@ -1,9 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceSupabase } from "@lp_so/shared/createServiceSupabase.ts";
-import { practicesGetReceiptEmail, practicesMarkPaid } from "@lp_so/shared/practicesOrdersRepo.ts";
-import { recordPracticesPaidCrm } from "@lp_so/shared/practicesPaidCrm.ts";
-import { sendPracticesPurchaseTelegram } from "@lp_so/shared/practicesPaidTelegram.ts";
-import { verifyTochkaWebhookJwt } from "@lp_so/shared/tochkaWebhookJwtVerify.ts";
+import { createServiceSupabase } from "../_shared/createServiceSupabase.ts";
+import { practicesGetReceiptEmail, practicesMarkPaid } from "../_shared/practicesOrdersRepo.ts";
+import { recordPracticesPaidCrm } from "../_shared/practicesPaidCrm.ts";
+import { sendPracticesPurchaseTelegram } from "../_shared/practicesPaidTelegram.ts";
+import { verifyTochkaWebhookJwt } from "../_shared/tochkaWebhookJwtVerify.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -38,6 +38,18 @@ function looksLikeOurOrderId(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     s.trim(),
   );
+}
+
+/** Точка в JWT может класть webhookType/status/paymentLinkId во вложенный `data` и т.п. */
+function mergeNestedWebhookBody(parsed: JsonRecord): JsonRecord {
+  const blobs: unknown[] = [parsed.data, parsed.body, parsed.payload];
+  let merged = { ...parsed };
+  for (const b of blobs) {
+    if (b && typeof b === "object" && !Array.isArray(b)) {
+      merged = { ...merged, ...(b as JsonRecord) };
+    }
+  }
+  return merged;
 }
 
 function collectLikelyOrderIds(val: unknown, found: Set<string>, depth: number): void {
@@ -136,7 +148,7 @@ Deno.serve(async (req) => {
 
   if (looksLikeJwtCompact(raw)) {
     try {
-      parsed = await verifyTochkaWebhookJwt(raw);
+      parsed = mergeNestedWebhookBody(await verifyTochkaWebhookJwt(raw));
       verifiedJwt = true;
     } catch (e) {
       console.warn("[tochka-notification] JWT verify failed", e instanceof Error ? e.message : e);

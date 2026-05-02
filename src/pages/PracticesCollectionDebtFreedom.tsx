@@ -8,6 +8,7 @@ import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functions
 import {
   getPracticesPaid,
   migratePracticesStorageFromWebhookMode,
+  PRACTICES_PENDING_ORDER_SESSION_KEY,
   PRACTICES_STORAGE_KEY,
   setPracticesPaid,
 } from "@/lib/practicesPurchase";
@@ -76,14 +77,22 @@ const outcomes = [
   "выйдете из состояния паралича и обретете силы, чтобы начать конструктивно решать свои финансовые вопросы",
 ];
 
-async function notifyPracticesCollectionLandingChannel(): Promise<void> {
+async function notifyPracticesCollectionLandingChannel(orderIdHint?: string | null): Promise<void> {
+  const fromUrl = orderIdHint?.trim() ?? "";
+  const fromSession =
+    typeof sessionStorage !== "undefined"
+      ? sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY)?.trim() ?? ""
+      : "";
+  const uuidRe =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const orderId = uuidRe.test(fromUrl) ? fromUrl : uuidRe.test(fromSession) ? fromSession : "";
   await fetch(functionsApiUrl("/practices-collection-landing"), {
     method: "POST",
     headers: {
       ...supabaseFunctionsInvokeHeaders(),
       "Content-Type": "application/json",
     },
-    body: "{}",
+    body: JSON.stringify(orderId ? { orderId } : {}),
   });
 }
 
@@ -111,7 +120,15 @@ const PracticesCollectionDebtFreedom = () => {
     const pay = searchParams.get("pay");
 
     if (pay === "ok") {
-      setPracticesPaid();
+      const oid = searchParams.get("oid")?.trim();
+      const uuidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const orderId =
+        oid && uuidRe.test(oid)
+          ? oid
+          : sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY)?.trim() ??
+            getPracticesPaid()?.orderId;
+      setPracticesPaid(orderId);
       setPracticesPaidState(true);
       const next = new URLSearchParams(searchParams);
       next.delete("pay");
@@ -121,7 +138,7 @@ const PracticesCollectionDebtFreedom = () => {
         title: "Оплата прошла",
         description: "Откройте бота ниже — доступ к сборнику там откроется.",
       });
-      notifyPracticesCollectionLandingChannel().catch(() => {});
+      notifyPracticesCollectionLandingChannel(orderId ?? null).catch(() => {});
       return;
     }
 

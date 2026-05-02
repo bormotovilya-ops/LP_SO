@@ -47,19 +47,26 @@ export async function sendPracticesPurchaseTelegram(orderId: string, receiptEmai
   }
 }
 
-/** Сигнал с сайта: пользователь вернулся со страницы оплаты Точки с `?pay=ok` (без OrderId в URL). */
-export async function sendPracticesTochkaReturnChannelNotify(): Promise<void> {
+/** Сигнал с сайта: пользователь вернулся со страницы оплаты Точки с `?pay=ok`. `orderId` — если банк/редирект передал номер заказа. */
+export async function sendPracticesTochkaReturnChannelNotify(orderId?: string | null): Promise<void> {
   const token = Deno.env.get("TELEGRAM_BOT_TOKEN")?.trim();
   const chatId = Deno.env.get("TELEGRAM_CHANNEL_ID")?.trim();
   if (!token || !chatId) return;
 
+  const orderLine = orderId?.trim()
+    ? `<b>OrderId:</b> <code>${escapeHtml(orderId.trim().slice(0, 80))}</code>`
+    : "";
+
   const html = [
     "<b>Оплата сборника</b> «Свобода от долгов и кредитов»",
     "",
-    "<b>Источник:</b> возврат на сайт после оплаты (прямая ссылка Точки, в URL есть <code>pay=ok</code>)",
+    "<b>Источник:</b> успешный возврат на сайт после оплаты (ссылка Точки)",
+    orderLine,
     "<b>Сумма на витрине:</b> 4 990 ₽",
     `<b>Время (UTC):</b> <code>${escapeHtml(new Date().toISOString())}</code>`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const tgRes = await fetch(`${TG_API}/bot${token}/sendMessage`, {
     method: "POST",

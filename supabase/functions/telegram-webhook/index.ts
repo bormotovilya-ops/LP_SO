@@ -363,6 +363,24 @@ async function savePracticesCollectionTelegramCrm(
       product: "practices_svoboda_ot_dolgov",
     },
   });
+
+  const note =
+    opts.orderSource === "tochka_page_return"
+      ? "Оплата через страницу Точки, материалы выданы из бота"
+      : opts.orderId
+        ? `Оплачен сборник (заказ ${opts.orderId.slice(0, 8)}…), материалы выданы из бота`
+        : "Оплачен сборник, материалы выданы из бота";
+
+  const { error: stageErr } = await client.rpc("crm_change_stage", {
+    p_contact_id: contactId,
+    p_to_stage_code: "paid",
+    p_changed_by: "system",
+    p_reason: "practices_collection_delivered",
+    p_note: note,
+  });
+  if (stageErr) {
+    console.warn("[telegram-webhook] practices collection crm_change_stage skipped", stageErr.message);
+  }
 }
 
 async function attemptCopyPracticesPostToChat(token: string, chatId: number): Promise<boolean> {
@@ -401,7 +419,7 @@ async function deliverPracticesAfterTochkaPageReturn(token: string, chatId: numb
   const opened = await sendTelegram(token, "sendMessage", {
     chat_id: chatId,
     text:
-      "Материалы сборника «Свобода от долгов» — ниже 📎 (копия поста из канала, как поларки). Доступ открывается после возврата на сайт с успешной оплатой.",
+      "Материалы сборника «Свобода от долгов» — ниже 📎",
     disable_web_page_preview: true,
     protect_content: true,
   });

@@ -458,7 +458,8 @@ entrypoint = "./functions/practices-paid-check/index.ts"
 
 [functions.practices-collection-landing]
 enabled = true
-verify_jwt = true
+# Публичный вызов с лендинга после ?pay=ok; anon JWT часто недоступен/битый в проде → уведомление в канал не уходило.
+verify_jwt = false
 import_map = "./functions/practices-collection-landing/deno.json"
 entrypoint = "./functions/practices-collection-landing/index.ts"
 
