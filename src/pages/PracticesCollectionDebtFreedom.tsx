@@ -205,12 +205,10 @@ const PracticesCollectionDebtFreedom = () => {
             <span className="font-display text-3xl text-accent">{PRACTICES_PRICE_LABEL}</span>
             <div className="min-w-0 flex-1">
               <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-                Разовый доступ к сборнику
+                Доступ к сборнику
               </span>
               <p className="mt-2 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                Оплата на защищённой странице Точка Банка (прямая ссылка). После успешной оплаты Точка возвращает на эту
-                страницу с <code className="text-foreground">pay=ok</code> в адресе — это и есть сигнал доступа здесь и
-                триггер уведомления во внутренний Telegram-канал.
+                Оплата на защищённой странице банка. После успешной оплаты вы вернётесь сюда — доступ откроется автоматически.
               </p>
             </div>
             <a href={tochkaCheckoutUrl} className={`${checkoutButtonClasses} ml-auto shrink-0`}>
@@ -223,10 +221,6 @@ const PracticesCollectionDebtFreedom = () => {
               <p className="text-sm font-medium leading-relaxed text-accent">
                 Спасибо за оплату. Откройте бота — файл сборника отправится из закрытого канала тем же способом, что и
                 поларки.
-              </p>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Не добавляйте вручную <code className="text-foreground">?pay=ok</code> без реального возврата с оплаты
-                Точки.
               </p>
               <a
                 href={practicesBotHref}
