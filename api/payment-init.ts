@@ -152,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const joinReturn = (status: "ok" | "fail"): string => {
     if (!siteOrigin) return "";
     const separator = returnPath.includes("?") ? "&" : "?";
-    return `${siteOrigin}${returnPath}${separator}pay=${status}`;
+    return `${siteOrigin}${returnPath}${separator}pay=${status}&oid=${encodeURIComponent(orderId)}`;
   };
 
   if (provider === "tbank") {

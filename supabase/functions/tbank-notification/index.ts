@@ -1,8 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
-import { createServiceSupabase } from "../_shared/createServiceSupabase.ts";
-import { practicesMarkPaid } from "../_shared/practicesOrdersRepo.ts";
-import { sendPracticesPurchaseTelegram } from "../_shared/practicesPaidTelegram.ts";
+import { createServiceSupabase } from "@lp_so/shared/createServiceSupabase.ts";
+import { practicesGetReceiptEmail, practicesMarkPaid } from "@lp_so/shared/practicesOrdersRepo.ts";
+import { recordPracticesPaidCrm } from "@lp_so/shared/practicesPaidCrm.ts";
+import { sendPracticesPurchaseTelegram } from "@lp_so/shared/practicesPaidTelegram.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -105,7 +106,13 @@ Deno.serve(async (req) => {
       const sb = createServiceSupabase();
       const firstPaid = await practicesMarkPaid(sb, orderIdRaw);
       if (firstPaid) {
-        await sendPracticesPurchaseTelegram(orderIdRaw);
+        const receiptEmail = await practicesGetReceiptEmail(sb, orderIdRaw);
+        await sendPracticesPurchaseTelegram(orderIdRaw, receiptEmail);
+        try {
+          await recordPracticesPaidCrm(sb, orderIdRaw);
+        } catch (crmE) {
+          console.error("[tbank-notification] CRM record failed", crmE);
+        }
       }
     } catch (e) {
       console.error("[tbank-notification] ledger error", e);

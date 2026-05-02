@@ -92,10 +92,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const lines = [
-    "<b>Оплата «Сборники практик»</b>",
+    "<b>Оплата сборника</b> «Свобода от долгов и кредитов»",
     "",
     `<b>OrderId:</b> <code>${escapeHtml(orderId)}</code>`,
-    "<b>Сумма на витрине:</b> 10 ₽",
+    "<b>Сумма:</b> 4 990 ₽",
     `<b>Время (UTC):</b> <code>${escapeHtml(new Date().toISOString())}</code>`,
   ];
 

@@ -1,8 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceSupabase } from "../_shared/createServiceSupabase.ts";
-import { practicesMarkPaid } from "../_shared/practicesOrdersRepo.ts";
-import { sendPracticesPurchaseTelegram } from "../_shared/practicesPaidTelegram.ts";
-import { verifyTochkaWebhookJwt } from "../_shared/tochkaWebhookJwtVerify.ts";
+import { createServiceSupabase } from "@lp_so/shared/createServiceSupabase.ts";
+import { practicesGetReceiptEmail, practicesMarkPaid } from "@lp_so/shared/practicesOrdersRepo.ts";
+import { recordPracticesPaidCrm } from "@lp_so/shared/practicesPaidCrm.ts";
+import { sendPracticesPurchaseTelegram } from "@lp_so/shared/practicesPaidTelegram.ts";
+import { verifyTochkaWebhookJwt } from "@lp_so/shared/tochkaWebhookJwtVerify.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -180,7 +181,13 @@ Deno.serve(async (req) => {
       const sb = createServiceSupabase();
       const firstPaid = await practicesMarkPaid(sb, orderId);
       if (firstPaid) {
-        await sendPracticesPurchaseTelegram(orderId);
+        const receiptEmail = await practicesGetReceiptEmail(sb, orderId);
+        await sendPracticesPurchaseTelegram(orderId, receiptEmail);
+        try {
+          await recordPracticesPaidCrm(sb, orderId);
+        } catch (crmE) {
+          console.error("[tochka-notification] CRM record failed", crmE);
+        }
       }
     } catch (e) {
       console.error("[tochka-notification] ledger error", e);

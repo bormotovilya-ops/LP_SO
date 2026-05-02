@@ -5,8 +5,10 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   /** Публичный anon key (Settings → API) для входа в CRM на сайте */
   readonly VITE_SUPABASE_ANON_KEY?: string;
-  /** Прямая ссылка на PDF/ZIP со «Сборниками практик» (иначе — файл из public/materials) */
+  /** Прямая ссылка на PDF/ZIP со «Сборниками практик» (если понадобится вне telegram-выдачи) */
   readonly VITE_PRACTICES_MATERIALS_URL?: string;
+  /** Эквайер для payment-init страницы сборника: `tochka` (по умолчанию) или `tbank` */
+  readonly VITE_PAYMENT_PROVIDER?: string;
   /** Внешняя страница оплаты Точки (каталог / checkout) для страницы сборника */
   readonly VITE_TOCHKA_CHECKOUT_URL?: string;
   /** Канонический домен продакшена без завершающего слэша (https://…). Нужен для canonical, sitemap и абсолютных og:image при сборке. */

@@ -8,8 +8,10 @@ const PRACTICES_VERIFIED_ORDER_KEY_V2 = "lp_so_practices_verified_order_v2";
 export const PRACTICES_PENDING_ORDER_SESSION_KEY = "lp_so_pending_payment_order_v1";
 
 export type PracticesPaidRecord = {
-  /** ISO-время фиксации успешного возврата с ?pay=ok */
+  /** ISO-время фиксации успешного возврата после проверки оплаты или ?pay=ok */
   paidAt: string;
+  /** OrderId из payment-init — для deep link к боту */
+  orderId?: string;
 };
 
 function safeParse(raw: string | null): PracticesPaidRecord | null {
@@ -19,7 +21,9 @@ function safeParse(raw: string | null): PracticesPaidRecord | null {
     if (!o || typeof o !== "object" || Array.isArray(o)) return null;
     const paidAt = (o as { paidAt?: unknown }).paidAt;
     if (typeof paidAt !== "string" || !paidAt) return null;
-    return { paidAt };
+    const orderIdRaw = (o as { orderId?: unknown }).orderId;
+    const orderId = typeof orderIdRaw === "string" && orderIdRaw.trim() ? orderIdRaw.trim() : undefined;
+    return orderId ? { paidAt, orderId } : { paidAt };
   } catch {
     return null;
   }
@@ -30,8 +34,11 @@ export function getPracticesPaid(): PracticesPaidRecord | null {
   return safeParse(window.localStorage.getItem(PRACTICES_STORAGE_KEY));
 }
 
-export function setPracticesPaid(): PracticesPaidRecord {
-  const record: PracticesPaidRecord = { paidAt: new Date().toISOString() };
+export function setPracticesPaid(orderId?: string): PracticesPaidRecord {
+  const record: PracticesPaidRecord = {
+    paidAt: new Date().toISOString(),
+    ...(orderId?.trim() ? { orderId: orderId.trim() } : {}),
+  };
   window.localStorage.setItem(PRACTICES_STORAGE_KEY, JSON.stringify(record));
   return record;
 }

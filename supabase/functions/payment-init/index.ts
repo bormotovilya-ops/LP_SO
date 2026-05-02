@@ -1,4 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createServiceSupabase } from "@lp_so/shared/createServiceSupabase.ts";
+import { practicesInsertInitiated } from "@lp_so/shared/practicesOrdersRepo.ts";
 
 const INIT_PROD = "https://securepay.tinkoff.ru/v2/Init";
 const INIT_TEST = "https://rest-api-test.tinkoff.ru/v2/Init";
@@ -126,6 +128,20 @@ Deno.serve(async (req) => {
   }
 
   const orderId = crypto.randomUUID();
+
+  try {
+    const sb = createServiceSupabase();
+    await practicesInsertInitiated(sb, {
+      order_id: orderId,
+      provider,
+      receipt_email: receiptEmail,
+      amount_kopecks: AMOUNT_KOPECKS,
+    });
+  } catch (e) {
+    console.error("[payment-init] practices_payment_orders insert failed", e);
+    return json({ error: "Не удалось зарегистрировать заказ. Попробуйте позже.", code: "ORDER_LEDGER_FAILED" }, 503);
+  }
+
   const joinReturn = (status: "ok" | "fail"): string => {
     const separator = returnPath.includes("?") ? "&" : "?";
     return `${siteOrigin}${returnPath}${separator}pay=${status}&oid=${encodeURIComponent(orderId)}`;

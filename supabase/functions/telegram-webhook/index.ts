@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const TG_API = "https://api.telegram.org";
 
@@ -59,6 +59,79 @@ function getChatId(update: JsonObject): number | null {
   if (!chat || typeof chat !== "object") return null;
   const id = (chat as JsonObject).id;
   return typeof id === "number" ? id : null;
+}
+
+/** Совпадает с `PRACTICES_COLLECTION_BOT_START_PAYLOAD` на фронте (прямая оплата Точка → `?pay=ok`). */
+const PRACTICES_COLLECTION_DIRECT_START = "src_site_practices_debt_free";
+
+function startCommandPayloadText(update: JsonObject): string | null {
+  const message = update.message;
+  if (!message || typeof message !== "object") return null;
+  const maybeText = (message as JsonObject).text;
+  const text = typeof maybeText === "string" ? maybeText.trim() : "";
+  if (!/^\/start\b/i.test(text)) return null;
+  return text.replace(/^\/start\s*/i, "").trim();
+}
+
+/** `src_site_practices_<uuid>` — ledger payment-init; `src_site_practices_debt_free` — возврат с сайта после Точки. */
+function parsePracticesCollectionStart(
+  update: JsonObject,
+): { mode: "ledger"; orderId: string } | { mode: "direct" } | null {
+  const payload = startCommandPayloadText(update);
+  if (!payload) return null;
+  const ledger =
+    /^src_site_practices_([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.exec(
+      payload,
+    );
+  if (ledger) return { mode: "ledger", orderId: ledger[1]! };
+  if (payload.toLowerCase() === PRACTICES_COLLECTION_DIRECT_START) return { mode: "direct" };
+  return null;
+}
+
+// ----- Сборник практик: только здесь (без supabase/functions/_shared) -----
+
+/** Service role только для проверки `practices_payment_orders` при start с UUID заказа. */
+function practicesCollectionServiceSupabase(): SupabaseClient {
+  const url = Deno.env.get("SUPABASE_URL")?.trim();
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (!url || !key) {
+    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+async function practicesCollectionLedgerIsPaid(sb: SupabaseClient, orderId: string): Promise<boolean> {
+  const { data, error } = await sb
+    .from("practices_payment_orders")
+    .select("order_id")
+    .eq("order_id", orderId)
+    .eq("status", "paid")
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data?.order_id);
+}
+
+const DEFAULT_PRACTICES_COLLECTION_FROM_CHAT_ID = "-1003917093952";
+const DEFAULT_PRACTICES_COLLECTION_MESSAGE_ID = 59;
+
+/** Пост в канале (как t.me/c/3917093952/59); бот — админ канала. */
+function resolvePracticesCollectionCopySource(): { from_chat_id: string; message_id: number } | null {
+  const fromRaw =
+    Deno.env.get("TELEGRAM_PRACTICES_FROM_CHAT_ID")?.trim() ??
+    Deno.env.get("TELEGRAM_GIFT_FROM_CHAT_ID")?.trim() ??
+    DEFAULT_PRACTICES_COLLECTION_FROM_CHAT_ID;
+
+  if (!/^-100\d+$/.test(fromRaw) && !/^-\d+$/.test(fromRaw)) return null;
+
+  const midRaw = Deno.env.get("TELEGRAM_PRACTICES_MESSAGE_ID")?.trim();
+  const message_id =
+    midRaw && /^\d+$/.test(midRaw) ? Number.parseInt(midRaw, 10) : DEFAULT_PRACTICES_COLLECTION_MESSAGE_ID;
+
+  if (!Number.isFinite(message_id) || message_id < 1) return null;
+
+  return { from_chat_id: fromRaw, message_id };
 }
 
 function buildWelcomeText(intent: StartIntent | null, firstName: string): string {
@@ -229,6 +302,160 @@ async function notifyChannel(
   });
 }
 
+async function savePracticesCollectionTelegramCrm(
+  update: JsonObject,
+  opts: {
+    orderId: string | null;
+    orderSource: "payment_ledger" | "tochka_page_return";
+    copyDelivered: boolean;
+  },
+): Promise<void> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRole) return;
+
+  const from = getMessageFrom(update);
+  const firstName = typeof from?.first_name === "string" ? from.first_name : "";
+  const lastName = typeof from?.last_name === "string" ? from.last_name : "";
+  const fullName = `${firstName} ${lastName}`.trim();
+  const telegramId = typeof from?.id === "number" ? from.id : null;
+  if (!telegramId) return;
+
+  const client = createClient(supabaseUrl, serviceRole, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  await client.rpc("crm_upsert_contact", {
+    p_full_name: fullName || null,
+    p_phone: null,
+    p_email: null,
+    p_telegram_id: telegramId,
+    p_source_channel: "telegram_bot",
+    p_source_detail: "practices_collection_delivery",
+    p_utm_source: null,
+    p_utm_medium: null,
+    p_utm_campaign: null,
+    p_utm_content: null,
+    p_utm_term: null,
+    p_segment: null,
+    p_owner_user_id: null,
+    p_consent_personal_data: false,
+    p_comment: "Получение материалов сборника после оплаты",
+  });
+
+  const { data: contacts } = await client
+    .from("crm_contacts")
+    .select("id")
+    .eq("telegram_id", telegramId)
+    .limit(1);
+  const contactId = contacts?.[0]?.id as string | undefined;
+  if (!contactId) return;
+
+  await client.rpc("crm_add_interaction", {
+    p_contact_id: contactId,
+    p_channel: "telegram",
+    p_direction: "outbound",
+    p_interaction_type: "outbound_practices_collection_file",
+    p_payload: {
+      orderId: opts.orderId,
+      orderSource: opts.orderSource,
+      copyDelivered: opts.copyDelivered,
+      product: "practices_svoboda_ot_dolgov",
+    },
+  });
+}
+
+async function attemptCopyPracticesPostToChat(token: string, chatId: number): Promise<boolean> {
+  const copySource = resolvePracticesCollectionCopySource();
+  if (!copySource) {
+    await sendTelegram(token, "sendMessage", {
+      chat_id: chatId,
+      text: "Выдача не настроена на сервере. Напишите в поддержку — пришлём файл.",
+      disable_web_page_preview: true,
+      protect_content: true,
+    });
+    return false;
+  }
+
+  const copied = await sendTelegram(token, "copyMessage", {
+    chat_id: chatId,
+    from_chat_id: copySource.from_chat_id,
+    message_id: copySource.message_id,
+    protect_content: true,
+  });
+
+  if (!copied) {
+    await sendTelegram(token, "sendMessage", {
+      chat_id: chatId,
+      text:
+        "Не удалось скопировать файл из канала. Проверьте, что бот — администратор канала с материалами.",
+      disable_web_page_preview: true,
+      protect_content: true,
+    });
+  }
+
+  return copied;
+}
+
+async function deliverPracticesAfterTochkaPageReturn(token: string, chatId: number): Promise<boolean> {
+  const opened = await sendTelegram(token, "sendMessage", {
+    chat_id: chatId,
+    text:
+      "Материалы сборника «Свобода от долгов» — ниже 📎 (копия поста из канала, как поларки). Доступ открывается после возврата на сайт с успешной оплатой.",
+    disable_web_page_preview: true,
+    protect_content: true,
+  });
+  if (!opened) return false;
+
+  return await attemptCopyPracticesPostToChat(token, chatId);
+}
+
+async function deliverPracticesCollectionFromChannel(
+  token: string,
+  chatId: number,
+  orderId: string,
+): Promise<{ paid: boolean; copyDelivered: boolean }> {
+  let paid = false;
+  let copyDelivered = false;
+  try {
+    const sb = practicesCollectionServiceSupabase();
+    paid = await practicesCollectionLedgerIsPaid(sb, orderId);
+  } catch (e) {
+    console.error("[telegram-webhook] practicesCollectionLedgerIsPaid failed", e);
+    await sendTelegram(token, "sendMessage", {
+      chat_id: chatId,
+      text: "Сервис временно недоступен. Напишите в поддержку — пришлём материалы вручную.",
+      disable_web_page_preview: true,
+      protect_content: true,
+    });
+    return { paid: false, copyDelivered: false };
+  }
+
+  if (!paid) {
+    await sendTelegram(token, "sendMessage", {
+      chat_id: chatId,
+      text:
+        "Пока не видим успешную оплату по этому заказу. Если только что оплатили, подождите минуту и нажмите /start ещё раз с той же ссылкой со страницы. Или напишите в поддержку.",
+      disable_web_page_preview: true,
+      protect_content: true,
+    });
+    return { paid: false, copyDelivered: false };
+  }
+
+  const opened = await sendTelegram(token, "sendMessage", {
+    chat_id: chatId,
+    text:
+      `Материалы сборника «Свобода от долгов» — ниже 📎 (тот же способ выдачи, что и медитации-поларки из канала). Заказ: ${orderId.slice(0, 8)}…`,
+    disable_web_page_preview: true,
+    protect_content: true,
+  });
+  if (!opened) return { paid: true, copyDelivered: false };
+
+  copyDelivered = await attemptCopyPracticesPostToChat(token, chatId);
+
+  return { paid: true, copyDelivered };
+}
+
 async function saveCrmBotEvent(
   update: JsonObject,
   intent: StartIntent | null,
@@ -324,6 +551,55 @@ Deno.serve(async (req) => {
 
   if (!isStartCommand(update)) {
     return json({ ok: true, skipped: true, reason: "not_start_command" }, 200);
+  }
+
+  const practicesStart = parsePracticesCollectionStart(update);
+  if (practicesStart) {
+    const chatIdPc = getChatId(update);
+    if (!chatIdPc) return json({ ok: true, skipped: true });
+
+    if (practicesStart.mode === "ledger") {
+      const { paid, copyDelivered } = await deliverPracticesCollectionFromChannel(
+        token,
+        chatIdPc,
+        practicesStart.orderId,
+      );
+      if (paid) {
+        await savePracticesCollectionTelegramCrm(update, {
+          orderId: practicesStart.orderId,
+          orderSource: "payment_ledger",
+          copyDelivered,
+        });
+      }
+      return json(
+        {
+          ok: true,
+          flow: "practices_collection",
+          mode: "ledger",
+          orderId: practicesStart.orderId,
+          paid,
+          copyDelivered,
+        },
+        200,
+      );
+    }
+
+    const copyDelivered = await deliverPracticesAfterTochkaPageReturn(token, chatIdPc);
+    await savePracticesCollectionTelegramCrm(update, {
+      orderId: null,
+      orderSource: "tochka_page_return",
+      copyDelivered,
+    });
+
+    return json(
+      {
+        ok: true,
+        flow: "practices_collection",
+        mode: "direct_tochka",
+        copyDelivered,
+      },
+      200,
+    );
   }
 
   const startPayload = getStartPayload(update);

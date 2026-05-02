@@ -8,10 +8,6 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const DEFAULT_BUCKET = "practice_materials";
-const DEFAULT_OBJECT = "sborniki-praktik.zip";
-const SIGN_TTL_SEC = 300;
-
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -33,32 +29,22 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: "Invalid JSON" }, 400);
   }
-  const orderId = typeof body.orderId === "string" ? body.orderId.trim() : "";
-  if (!orderId || orderId.length > 120) {
-    return json({ error: "Missing orderId" }, 400);
-  }
 
-  const bucket = Deno.env.get("PRACTICES_STORAGE_BUCKET")?.trim() || DEFAULT_BUCKET;
-  const objectPath = Deno.env.get("PRACTICES_STORAGE_OBJECT")?.trim() || DEFAULT_OBJECT;
+  const orderId = typeof body.orderId === "string" ? body.orderId.trim() : "";
+  if (!orderId || orderId.length > 120 || !looksLikeUuidV4(orderId)) {
+    return json({ error: "Invalid orderId" }, 400);
+  }
 
   try {
     const sb = createServiceSupabase();
     const paid = await practicesIsPaid(sb, orderId);
-    if (!paid) {
-      return json({ ok: false, pending: true, error: "Payment not confirmed" }, 402);
-    }
-    const { data, error } = await sb.storage.from(bucket).createSignedUrl(objectPath, SIGN_TTL_SEC);
-    if (error || !data?.signedUrl) {
-      console.error("[practices-access] signed url failed", error);
-      return json({ ok: false, error: "Materials unavailable — upload file to Supabase Storage" }, 503);
-    }
-    return json({
-      ok: true,
-      signedUrl: data.signedUrl,
-      expiresInSeconds: SIGN_TTL_SEC,
-    });
+    return json({ paid }, 200);
   } catch (e) {
-    console.error("[practices-access]", e);
-    return json({ ok: false, error: "Server misconfigured or database error" }, 500);
+    console.error("[practices-paid-check]", e);
+    return json({ error: "Server error" }, 500);
   }
 });
+
+function looksLikeUuidV4(s: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s.trim());
+}

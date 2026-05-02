@@ -450,6 +450,18 @@ verify_jwt = true
 import_map = "./functions/practices-access/deno.json"
 entrypoint = "./functions/practices-access/index.ts"
 
+[functions.practices-paid-check]
+enabled = true
+verify_jwt = true
+import_map = "./functions/practices-paid-check/deno.json"
+entrypoint = "./functions/practices-paid-check/index.ts"
+
+[functions.practices-collection-landing]
+enabled = true
+verify_jwt = true
+import_map = "./functions/practices-collection-landing/deno.json"
+entrypoint = "./functions/practices-collection-landing/index.ts"
+
 [functions.practices-paid-notify]
 enabled = true
 verify_jwt = true

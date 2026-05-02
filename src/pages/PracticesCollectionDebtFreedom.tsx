@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Footer } from "@/components/landing/Footer";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
+import { buildPracticesCollectionTelegramBotUrl } from "@/lib/botLinks";
+import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import {
   getPracticesPaid,
   migratePracticesStorageFromWebhookMode,
@@ -11,7 +13,7 @@ import {
 } from "@/lib/practicesPurchase";
 import portraitImage from "../../old/фото-16.jpg";
 
-/** Платёжная страница Точки (каталог). Переопределение: VITE_TOCHKA_CHECKOUT_URL в .env / Variables сборки */
+/** Платёжная страница Точки (каталог). Переопределение: `VITE_TOCHKA_CHECKOUT_URL` в .env / переменные сборки. */
 const DEFAULT_TOCHKA_CHECKOUT_URL =
   "https://checkout.tochka.com/bc380cff-5068-49b3-a450-73b2e54d7684";
 
@@ -74,34 +76,30 @@ const outcomes = [
   "выйдете из состояния паралича и обретете силы, чтобы начать конструктивно решать свои финансовые вопросы",
 ];
 
+async function notifyPracticesCollectionLandingChannel(): Promise<void> {
+  await fetch(functionsApiUrl("/practices-collection-landing"), {
+    method: "POST",
+    headers: {
+      ...supabaseFunctionsInvokeHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+  });
+}
+
 const PracticesCollectionDebtFreedom = () => {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [practicesPaid, setPracticesPaidState] = useState(false);
+  const [practicesPaid, setPracticesPaidState] = useState(() =>
+    typeof window !== "undefined" ? Boolean(getPracticesPaid()) : false,
+  );
 
   const tochkaCheckoutUrl = useMemo(() => {
     const fromEnv = import.meta.env.VITE_TOCHKA_CHECKOUT_URL?.trim();
     return fromEnv || DEFAULT_TOCHKA_CHECKOUT_URL;
   }, []);
 
-  const materialsHref = useMemo(() => {
-    const fromEnv = import.meta.env.VITE_PRACTICES_MATERIALS_URL?.trim();
-    if (fromEnv) return fromEnv;
-    const base = import.meta.env.BASE_URL.endsWith("/")
-      ? import.meta.env.BASE_URL
-      : `${import.meta.env.BASE_URL}/`;
-    return `${base}materials/sborniki-praktik.zip`;
-  }, []);
-
-  const materialsDownloadAttr = useMemo(() => {
-    if (typeof window === "undefined") return true;
-    try {
-      const u = new URL(materialsHref, window.location.origin);
-      return u.origin === window.location.origin;
-    } catch {
-      return false;
-    }
-  }, [materialsHref]);
+  const practicesBotHref = useMemo(() => buildPracticesCollectionTelegramBotUrl(), []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -111,6 +109,7 @@ const PracticesCollectionDebtFreedom = () => {
     migratePracticesStorageFromWebhookMode();
 
     const pay = searchParams.get("pay");
+
     if (pay === "ok") {
       setPracticesPaid();
       setPracticesPaidState(true);
@@ -121,10 +120,12 @@ const PracticesCollectionDebtFreedom = () => {
       toast({
         title: "Оплата прошла",
         description:
-          "Материалы можно скачать ниже. Доступ сохранится в этом браузере на этом устройстве.",
+          "Откройте бота ниже — материалы придут из канала, как поларки. На стороне Точки в ссылке возврата должен быть параметр pay=ok.",
       });
+      notifyPracticesCollectionLandingChannel().catch(() => {});
       return;
     }
+
     if (pay === "fail") {
       const next = new URLSearchParams(searchParams);
       next.delete("pay");
@@ -132,11 +133,13 @@ const PracticesCollectionDebtFreedom = () => {
       setSearchParams(next, { replace: true });
       toast({
         title: "Оплата не завершена",
-        description: "Если списание прошло с задержкой, обновите страницу или напишите в Telegram.",
+        description:
+          "Если списание прошло с задержкой, обновите страницу или напишите в Telegram.",
         variant: "destructive",
       });
       return;
     }
+
     setPracticesPaidState(Boolean(getPracticesPaid()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -205,33 +208,33 @@ const PracticesCollectionDebtFreedom = () => {
                 Разовый доступ к сборнику
               </span>
               <p className="mt-2 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                Оплата на защищённой странице Точка Банка. Email для чека (если нужен) можно указать
-                уже в процессе оплаты там.
+                Оплата на защищённой странице Точка Банка (прямая ссылка). После успешной оплаты Точка возвращает на эту
+                страницу с <code className="text-foreground">pay=ok</code> в адресе — это и есть сигнал доступа здесь и
+                триггер уведомления во внутренний Telegram-канал.
               </p>
             </div>
-            <a
-              href={tochkaCheckoutUrl}
-              className={`${checkoutButtonClasses} ml-auto shrink-0`}
-            >
+            <a href={tochkaCheckoutUrl} className={`${checkoutButtonClasses} ml-auto shrink-0`}>
               Оплатить {PRACTICES_PRICE_LABEL}
             </a>
           </div>
+
           {practicesPaid && (
             <div className="mb-10 flex flex-col items-start gap-4 border border-hairline bg-surface/40 p-6">
               <p className="text-sm font-medium leading-relaxed text-accent">
-                Спасибо за оплату. Можно скачать сборник ниже — ссылка ведёт на статический файл.
+                Спасибо за оплату. Откройте бота — файл сборника отправится из закрытого канала тем же способом, что и
+                поларки.
               </p>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Доступ привязан к этому браузеру после возврата с оплаты. Не добавляйте вручную{" "}
-                <code className="text-foreground">?pay=ok</code> без оплаты: это не доказывает платёж
-                перед кассой.
+                Не добавляйте вручную <code className="text-foreground">?pay=ok</code> без реального возврата с оплаты
+                Точки.
               </p>
               <a
-                href={materialsHref}
-                {...(materialsDownloadAttr ? { download: true } : {})}
+                href={practicesBotHref}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 border border-foreground/25 bg-background px-5 py-3 text-xs uppercase tracking-[0.22em] text-foreground transition-colors hover:border-accent hover:text-accent"
               >
-                Скачать материалы
+                Открыть бота и получить сборник
               </a>
             </div>
           )}
@@ -275,12 +278,10 @@ const PracticesCollectionDebtFreedom = () => {
           <article>
             <h2 className="font-display text-3xl md:text-4xl">Какой результат вы получите</h2>
             <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
-              Этот сборник - ваш первый шаг к пересборке реальности. Глубинная трансформация
-              требует времени, но прямо сейчас вам нужно просто начать дышать.
+              Этот сборник - ваш первый шаг к пересборке реальности. Глубинная трансформация требует времени, но прямо
+              сейчас вам нужно просто начать дышать.
             </p>
-            <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
-              После прохождения практик вы:
-            </p>
+            <p className="mt-5 text-sm leading-relaxed text-muted-foreground">После прохождения практик вы:</p>
             <ul className="mt-5 space-y-4 text-sm leading-relaxed text-muted-foreground">
               {outcomes.map((item) => (
                 <li key={item} className="flex gap-3">
@@ -290,8 +291,7 @@ const PracticesCollectionDebtFreedom = () => {
               ))}
             </ul>
             <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
-              Это ваш фундамент спокойствия, без которого невозможно построить устойчивый капитал
-              и выйти в масштаб.
+              Это ваш фундамент спокойствия, без которого невозможно построить устойчивый капитал и выйти в масштаб.
             </p>
           </article>
         </div>
@@ -302,9 +302,9 @@ const PracticesCollectionDebtFreedom = () => {
           <div className="max-w-4xl border border-accent/35 bg-[linear-gradient(120deg,hsl(var(--surface)),hsl(var(--background))_65%)] p-8 shadow-[0_18px_50px_-42px_hsl(var(--accent)/0.8)] md:p-10">
             <h2 className="font-display text-3xl md:text-4xl">Почему это важно сейчас</h2>
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-              Долги закрываются не тогда, когда вы больше работаете, а когда вы перестаете их
-              бояться. Этот сборник даст вам фундамент и спокойствие, чтобы вы смогли сделать свой
-              первый шаг из «выживания» в нормальную, свободную жизнь ❤️
+              Долги закрываются не тогда, когда вы больше работаете, а когда вы перестаете их бояться. Этот сборник даст
+              вам фундамент и спокойствие, чтобы вы смогли сделать свой первый шаг из «выживания» в нормальную, свободную
+              жизнь ❤️
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <a href={tochkaCheckoutUrl} className={checkoutButtonClassesSecondary}>

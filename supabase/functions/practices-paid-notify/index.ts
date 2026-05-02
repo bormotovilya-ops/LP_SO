@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-import { sendPracticesPurchaseTelegram } from "../_shared/practicesPaidTelegram.ts";
+import { sendPracticesPurchaseTelegram } from "@lp_so/shared/practicesPaidTelegram.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

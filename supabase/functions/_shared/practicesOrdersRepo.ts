@@ -45,3 +45,14 @@ export async function practicesIsPaid(sb: SupabaseClient, orderId: string): Prom
   if (error) throw error;
   return Boolean(data?.order_id);
 }
+
+export async function practicesGetReceiptEmail(sb: SupabaseClient, orderId: string): Promise<string | null> {
+  const { data, error } = await sb
+    .from("practices_payment_orders")
+    .select("receipt_email")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (error || !data?.receipt_email) return null;
+  const s = typeof data.receipt_email === "string" ? data.receipt_email.trim() : "";
+  return s ? s : null;
+}
