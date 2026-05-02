@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const TG_API = "https://api.telegram.org";
 const MAX_FIELD = 4000;
@@ -37,10 +37,10 @@ function normalizePhone(raw: string): string {
 }
 
 function pickStageCode(eventType: string): string {
-  if (eventType === "quiz_completed") return "quiz_completed";
-  if (eventType === "gift_received") return "gift_received";
-  if (eventType === "bot_started") return "bot_started";
-  return "diagnostic_requested";
+  if (eventType === "quiz_completed") return "interest_confirmed";
+  if (eventType === "gift_received") return "new_lead";
+  if (eventType === "bot_started") return "new_lead";
+  return "interest_confirmed";
 }
 
 Deno.serve(async (req) => {
