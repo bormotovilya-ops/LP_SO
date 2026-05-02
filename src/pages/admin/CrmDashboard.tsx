@@ -68,6 +68,13 @@ function num(x: unknown, fallback = 0): number {
   return fallback;
 }
 
+/** Подписи на графике воронки: убираем пояснения в скобках, чтобы строки были короче. */
+function stageChartLabel(displayName: string): string {
+  const s = displayName.trim();
+  const shortened = s.replace(/\s*\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+  return shortened || s;
+}
+
 function unwrapRpcDashboard(data: unknown): Record<string, unknown> | null {
   if (Array.isArray(data)) {
     const first = data[0];
@@ -355,7 +362,7 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
     return [...f]
       .sort((a, b) => num(a.sort_order) - num(b.sort_order))
       .map((s) => ({
-        name: s.name,
+        name: stageChartLabel(s.name),
         code: s.code,
         count: num(s.count),
       }));
