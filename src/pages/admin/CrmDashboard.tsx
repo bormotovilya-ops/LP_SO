@@ -22,7 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type FunnelChartVariant = "bar" | "barHorizontal" | "pie";
 
@@ -31,6 +30,8 @@ type TrendChartVariant = "line" | "bar" | "area";
 type FunnelRow = { name: string; code: string; count: number };
 
 type TrendDatum = { label: string; count: number };
+
+type MixRowRpc = { code: string; label: string; count: number | string };
 
 type DashboardMetrics = {
   total_contacts: number;
@@ -42,14 +43,12 @@ type DashboardMetrics = {
     sort_order: number;
     count: number | string;
   }>;
-  stage_conversion: Array<{
-    code: string;
-    name: string;
-    sort_order: number;
-    count: number | string;
-    pct_of_previous: number | string | null;
-  }>;
   top_source_channels: Array<{ channel: string; count: number | string }>;
+  tasks_total_all: number;
+  tasks_active_open_progress: number;
+  tasks_overdue_active: number;
+  task_status_mix: MixRowRpc[];
+  task_assignee_active_mix: MixRowRpc[];
   sla_first_activity: {
     cohort_with_activity: number | string;
     pct_within_24h: number | string | null;
@@ -90,9 +89,6 @@ function parseDashboardMetrics(raw: unknown): DashboardMetrics | null {
     total_contacts: num(o.total_contacts),
     new_contacts_last_7d: num(o.new_contacts_last_7d),
     funnel: Array.isArray(o.funnel) ? (o.funnel as DashboardMetrics["funnel"]) : [],
-    stage_conversion: Array.isArray(o.stage_conversion)
-      ? (o.stage_conversion as DashboardMetrics["stage_conversion"])
-      : [],
     top_source_channels: Array.isArray(o.top_source_channels)
       ? (o.top_source_channels as DashboardMetrics["top_source_channels"])
       : [],
@@ -110,6 +106,13 @@ function parseDashboardMetrics(raw: unknown): DashboardMetrics | null {
     })(),
     new_per_day_utc_7d: Array.isArray(o.new_per_day_utc_7d)
       ? (o.new_per_day_utc_7d as DashboardMetrics["new_per_day_utc_7d"])
+      : [],
+    tasks_total_all: num(o.tasks_total_all),
+    tasks_active_open_progress: num(o.tasks_active_open_progress),
+    tasks_overdue_active: num(o.tasks_overdue_active),
+    task_status_mix: Array.isArray(o.task_status_mix) ? (o.task_status_mix as MixRowRpc[]) : [],
+    task_assignee_active_mix: Array.isArray(o.task_assignee_active_mix)
+      ? (o.task_assignee_active_mix as MixRowRpc[])
       : [],
   };
 }
@@ -318,17 +321,38 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
     }));
   }, [metrics.top_source_channels]);
 
+  const taskStatusBars = useMemo<FunnelRow[]>(
+    () =>
+      metrics.task_status_mix.map((r) => ({
+        name: r.label || r.code,
+        code: r.code,
+        count: num(r.count),
+      })),
+    [metrics.task_status_mix],
+  );
+
+  const taskAssigneeBars = useMemo<FunnelRow[]>(
+    () =>
+      metrics.task_assignee_active_mix.map((r) => ({
+        name: r.label || r.code,
+        code: r.code,
+        count: num(r.count),
+      })),
+    [metrics.task_assignee_active_mix],
+  );
+
   const total = metrics.total_contacts;
   const newInWeek = metrics.new_contacts_last_7d;
   const stageKinds = metrics.funnel.filter((s) => num(s.count) > 0).length;
   const sla = metrics.sla_first_activity;
+  const medianHours = sla?.median_hours_to_activity;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-3xl text-foreground">Дашборд</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Воронка, источники, конверсия между этапами и SLA-прокси по первой активности (последние 30 дней)
+          Ключевые цифры, воронка, источники и приток лидов за неделю
         </p>
       </div>
 
@@ -366,15 +390,15 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
         <Card className="border-hairline bg-surface/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-normal uppercase tracking-[0.2em] text-muted-foreground">
-              SLA: ≤24 ч до активности*
+              До первой активности (медиана)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="font-display text-4xl text-foreground">
-              {sla?.pct_within_24h != null ? `${num(sla.pct_within_24h)}%` : "—"}
+              {medianHours != null ? `${num(medianHours)} ч` : "—"}
             </p>
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Лиды 30 дн. с признаком last_activity ({num(sla?.cohort_with_activity)} шт.).
+              По лидам за 30 дн. с известным last_activity (N = {num(sla?.cohort_with_activity)}).
             </p>
           </CardContent>
         </Card>
@@ -468,72 +492,54 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
         </Card>
 
         <Card className="border-hairline bg-surface/20">
-          <CardHeader>
-            <CardTitle className="font-display text-lg">Конверсия к предыдущему этапу воронки</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="font-display text-lg">Задачи по статусам и ответственным</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Доля лидов на этапе относительно предыдущего по порядку sort_order. Первый этап — без доли.
+              Всего записей в задачах: <span className="tabular-nums text-foreground">{metrics.tasks_total_all}</span>.
+              Активных (открыта или в работе):{" "}
+              <span className="tabular-nums text-foreground">{metrics.tasks_active_open_progress}</span>
+              ; с просроченным сроком среди активных:{" "}
+              <span className="tabular-nums text-foreground">{metrics.tasks_overdue_active}</span>.
             </p>
           </CardHeader>
-          <CardContent className="overflow-x-auto px-2 pt-2">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-hairline">
-                  <TableHead className="text-xs uppercase tracking-wider">Этап</TableHead>
-                  <TableHead className="text-right text-xs uppercase tracking-wider">Лидов</TableHead>
-                  <TableHead className="text-right text-xs uppercase tracking-wider">К пред.</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {metrics.stage_conversion.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-muted-foreground">
-                      Нет данных воронки
-                    </TableCell>
-                  </TableRow>
+          <CardContent className="space-y-6 pb-6">
+            <div>
+              <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">По статусу</p>
+              <div className="h-[220px] pl-0">
+                {metrics.task_status_mix.length > 0 ? (
+                  <FunnelChartView variant="barHorizontal" data={taskStatusBars} />
                 ) : (
-                  metrics.stage_conversion
-                    .slice()
-                    .sort((a, b) => num(a.sort_order) - num(b.sort_order))
-                    .map((row) => (
-                      <TableRow key={row.code} className="border-hairline">
-                        <TableCell className="max-w-[200px] text-sm">{row.name}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{num(row.count)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-                          {row.pct_of_previous == null ? "—" : `${num(row.pct_of_previous)}%`}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                  <p className="text-sm text-muted-foreground">
+                    Нет блока задач в ответе RPC — примените миграцию{" "}
+                    <code className="rounded bg-muted px-1 py-px text-[11px]">
+                      20260507130000_crm_dashboard_task_mix
+                    </code>
+                    .
+                  </p>
                 )}
-              </TableBody>
-            </Table>
+              </div>
+            </div>
+            <div className="border-hairline border-t pt-4">
+              <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Активные по ответственному (имя из CRM-профиля)
+              </p>
+              <div className="h-[220px] pl-0">
+                {metrics.task_status_mix.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    См. миграцию в блоке «По статусу» выше.
+                  </p>
+                ) : metrics.tasks_active_open_progress <= 0 ? (
+                  <p className="text-sm text-muted-foreground">Нет задач со статусом «открыта» или «в работе».</p>
+                ) : metrics.task_assignee_active_mix.length > 0 ? (
+                  <FunnelChartView variant="barHorizontal" data={taskAssigneeBars} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Нет данных по ответственным.</p>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      <Card className="border-hairline bg-surface/20">
-        <CardHeader className="pb-2">
-          <CardTitle className="font-display text-lg text-foreground">
-            SLA-прокси: время до первой активности*
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            Считается по лидам за последние 30 дней, у которых заполнены и created_at и last_activity_at.
-            Первая активность здесь трактуется через поле last_activity_at (нет разбора отдельных касаний).
-          </p>
-          <p>
-            Доля лидов, у которых первая зафиксированная активность наступила в течение 24 часов после создания:{" "}
-            <strong className="text-foreground">
-              {sla?.pct_within_24h != null ? `${num(sla.pct_within_24h)}%` : "—"}
-            </strong>
-            . Медиана часов от создания до этой активности:{" "}
-            <strong className="text-foreground">
-              {sla?.median_hours_to_activity != null ? `${num(sla.median_hours_to_activity)} ч` : "—"}
-            </strong>{" "}
-            (выборка: {num(sla?.cohort_with_activity)} контактов).
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
