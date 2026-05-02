@@ -1,11 +1,14 @@
 /** Ключ в localStorage; можно слушать `storage` в других вкладках */
 export const PRACTICES_STORAGE_KEY = "lp_so_practices_paid_v1";
 
-/** sessionStorage: OrderId из Init до возврата с формы оплаты (для уведомления в Telegram) */
+/** Старый режим «только после webhook»: убираем при первом открытии страницы */
+const PRACTICES_VERIFIED_ORDER_KEY_V2 = "lp_so_practices_verified_order_v2";
+
+/** sessionStorage: OrderId из Init до возврата с формы оплаты */
 export const PRACTICES_PENDING_ORDER_SESSION_KEY = "lp_so_pending_payment_order_v1";
 
 export type PracticesPaidRecord = {
-  /** ISO-время фиксации успешной оплаты (редирект с ?pay=ok) */
+  /** ISO-время фиксации успешного возврата с ?pay=ok */
   paidAt: string;
 };
 
@@ -35,4 +38,10 @@ export function setPracticesPaid(): PracticesPaidRecord {
 
 export function clearPracticesPaid(): void {
   window.localStorage.removeItem(PRACTICES_STORAGE_KEY);
+}
+
+/** Убираем следы интеграции с webhook; после возврата с оплаты снова хватает ?pay=ok. */
+export function migratePracticesStorageFromWebhookMode(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(PRACTICES_VERIFIED_ORDER_KEY_V2);
 }

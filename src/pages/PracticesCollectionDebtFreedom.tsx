@@ -1,34 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Footer } from "@/components/landing/Footer";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import {
   getPracticesPaid,
-  PRACTICES_PENDING_ORDER_SESSION_KEY,
+  migratePracticesStorageFromWebhookMode,
   PRACTICES_STORAGE_KEY,
   setPracticesPaid,
 } from "@/lib/practicesPurchase";
-import { functionsApiUrl } from "@/lib/functionsApi";
 import portraitImage from "../../old/фото-16.jpg";
 
-function stripPayQueryFromUrl(): void {
-  const params = new URLSearchParams(window.location.search);
-  const hadPay = params.has("pay");
-  const hadOid = params.has("oid");
-  if (!hadPay && !hadOid) return;
-  params.delete("pay");
-  params.delete("oid");
-  const q = params.toString();
-  const path = window.location.pathname;
-  const hash = window.location.hash;
-  window.history.replaceState({}, "", `${path}${q ? `?${q}` : ""}${hash}`);
-}
+/** Платёжная страница Точки (каталог). Переопределение: VITE_TOCHKA_CHECKOUT_URL в .env / Variables сборки */
+const DEFAULT_TOCHKA_CHECKOUT_URL =
+  "https://checkout.tochka.com/30e41ac2-c228-4470-a12c-482732cf8b63";
 
-function normalizeBasePath(baseUrl: string): string {
-  if (!baseUrl || baseUrl === "/") return "/";
-  return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-}
+const checkoutButtonClasses =
+  "inline-flex items-center justify-center border border-accent bg-background/85 px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground";
+
+const checkoutButtonClassesSecondary =
+  "inline-flex items-center justify-center border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground";
 
 const blocks = [
   {
@@ -83,10 +74,13 @@ const outcomes = [
 
 const PracticesCollectionDebtFreedom = () => {
   const { toast } = useToast();
-  const [paying, setPaying] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [practicesPaid, setPracticesPaidState] = useState(false);
-  const [receiptEmail, setReceiptEmail] = useState("");
-  const paymentStartRef = useRef(false);
+
+  const tochkaCheckoutUrl = useMemo(() => {
+    const fromEnv = import.meta.env.VITE_TOCHKA_CHECKOUT_URL?.trim();
+    return fromEnv || DEFAULT_TOCHKA_CHECKOUT_URL;
+  }, []);
 
   const materialsHref = useMemo(() => {
     const fromEnv = import.meta.env.VITE_PRACTICES_MATERIALS_URL?.trim();
@@ -112,40 +106,38 @@ const PracticesCollectionDebtFreedom = () => {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const pay = params.get("pay");
-    const orderIdFromUrl = params.get("oid")?.trim() ?? "";
+    migratePracticesStorageFromWebhookMode();
+
+    const pay = searchParams.get("pay");
     if (pay === "ok") {
       setPracticesPaid();
       setPracticesPaidState(true);
-      const pendingOrderId =
-        orderIdFromUrl || sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY) || "";
-      sessionStorage.removeItem(PRACTICES_PENDING_ORDER_SESSION_KEY);
-      if (pendingOrderId) {
-        void fetch(functionsApiUrl("/practices-paid-notify"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId: pendingOrderId }),
-        }).catch(() => {});
-      }
-      stripPayQueryFromUrl();
+      const next = new URLSearchParams(searchParams);
+      next.delete("pay");
+      next.delete("oid");
+      setSearchParams(next, { replace: true });
       toast({
         title: "Оплата прошла",
-        description: "Материалы можно скачать ниже. Доступ сохранится в этом браузере.",
+        description:
+          "Материалы можно скачать ниже. Доступ сохранится в этом браузере на этом устройстве.",
       });
       return;
     }
     if (pay === "fail") {
-      stripPayQueryFromUrl();
+      const next = new URLSearchParams(searchParams);
+      next.delete("pay");
+      next.delete("oid");
+      setSearchParams(next, { replace: true });
       toast({
         title: "Оплата не завершена",
         description: "Если списание прошло с задержкой, обновите страницу или напишите в Telegram.",
         variant: "destructive",
       });
+      return;
     }
     setPracticesPaidState(Boolean(getPracticesPaid()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -155,54 +147,6 @@ const PracticesCollectionDebtFreedom = () => {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
-
-  const startPayment = async () => {
-    if (paymentStartRef.current || paying) return;
-
-    const email = receiptEmail.trim();
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailOk) {
-      toast({
-        title: "Укажите email для чека",
-        description: "Перед оплатой нужно ввести корректный email, на него придет кассовый чек.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    paymentStartRef.current = true;
-    setPaying(true);
-    try {
-      const res = await fetch(functionsApiUrl("/payment-init"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          receiptEmail: email,
-          siteOrigin: window.location.origin,
-          // GitHub Pages cannot open deep links directly; return to app root first.
-          returnPath: normalizeBasePath(import.meta.env.BASE_URL),
-        }),
-      });
-      const data = (await res.json()) as { paymentUrl?: string; orderId?: string; error?: string };
-      if (!res.ok || !data.paymentUrl) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-      if (data.orderId) {
-        sessionStorage.setItem(PRACTICES_PENDING_ORDER_SESSION_KEY, data.orderId);
-      }
-      // Open payment in the current tab to avoid popup blockers and duplicate windows.
-      window.location.assign(data.paymentUrl);
-    } catch {
-      toast({
-        title: "Оплата недоступна",
-        description: "Попробуйте позже или напишите в Telegram.",
-        variant: "destructive",
-      });
-    } finally {
-      paymentStartRef.current = false;
-      setPaying(false);
-    }
-  };
 
   return (
     <main className="relative min-h-screen bg-background text-foreground">
@@ -254,38 +198,31 @@ const PracticesCollectionDebtFreedom = () => {
         <div className="container-luxe">
           <div className="mb-8 flex flex-wrap items-center gap-4 border border-accent/30 bg-[linear-gradient(115deg,hsl(var(--accent)/0.12),hsl(var(--background))_60%)] px-6 py-5 shadow-[0_16px_42px_-34px_hsl(var(--accent)/0.55)]">
             <span className="font-display text-3xl text-accent">5 ₽</span>
-            <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-              Разовый доступ к сборнику
-            </span>
-            <label className="min-w-[240px] flex-1">
-              <span className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Email для чека
+            <div className="min-w-0 flex-1">
+              <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                Разовый доступ к сборнику
               </span>
-              <input
-                type="email"
-                value={receiptEmail}
-                onChange={(e) => setReceiptEmail(e.target.value)}
-                placeholder="name@example.com"
-                autoComplete="email"
-                className="w-full border border-hairline bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-accent"
-              />
-              <span className="mt-1 block text-xs text-muted-foreground">
-                На этот адрес придет кассовый чек и подтверждение оплаты.
-              </span>
-            </label>
-            <button
-              type="button"
-              disabled={paying}
-              onClick={() => void startPayment()}
-              className="ml-auto inline-flex items-center justify-center border border-accent bg-background/85 px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+              <p className="mt-2 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                Оплата на защищённой странице Точка Банка. Email для чека (если нужен) можно указать
+                уже в процессе оплаты там.
+              </p>
+            </div>
+            <a
+              href={tochkaCheckoutUrl}
+              className={`${checkoutButtonClasses} ml-auto shrink-0`}
             >
-              {paying ? "Открываем оплату..." : "Оплатить 5 ₽"}
-            </button>
+              Оплатить 5 ₽
+            </a>
           </div>
           {practicesPaid && (
             <div className="mb-10 flex flex-col items-start gap-4 border border-hairline bg-surface/40 p-6">
               <p className="text-sm font-medium leading-relaxed text-accent">
-                Оплачено. Материалы доступны для скачивания в этом браузере.
+                Спасибо за оплату. Можно скачать сборник ниже — ссылка ведёт на статический файл.
+              </p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Доступ привязан к этому браузеру после возврата с оплаты. Не добавляйте вручную{" "}
+                <code className="text-foreground">?pay=ok</code> без оплаты: это не доказывает платёж
+                перед кассой.
               </p>
               <a
                 href={materialsHref}
@@ -368,14 +305,9 @@ const PracticesCollectionDebtFreedom = () => {
               первый шаг из «выживания» в нормальную, свободную жизнь ❤️
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={paying}
-                onClick={() => void startPayment()}
-                className="inline-flex items-center justify-center border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-              >
-                {paying ? "Открываем оплату..." : "Перейти к оплате 5 ₽"}
-              </button>
+              <a href={tochkaCheckoutUrl} className={checkoutButtonClassesSecondary}>
+                Перейти к оплате 5 ₽
+              </a>
               <Link
                 to="/#products"
                 className="inline-flex items-center justify-center border border-hairline px-5 py-3 text-xs uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:border-accent hover:text-accent"

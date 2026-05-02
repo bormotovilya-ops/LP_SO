@@ -1,5 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
+import { createServiceSupabase } from "../_shared/createServiceSupabase.ts";
+import { practicesMarkPaid } from "../_shared/practicesOrdersRepo.ts";
+import { sendPracticesPurchaseTelegram } from "../_shared/practicesPaidTelegram.ts";
+
 type JsonRecord = Record<string, unknown>;
 
 function getRootCI(body: JsonRecord, name: string): unknown {
@@ -72,13 +76,41 @@ Deno.serve(async (req) => {
     return new Response("FORBIDDEN", { status: 403 });
   }
 
+  const orderIdRaw = String(getRootCI(body, "OrderId") ?? "").trim();
+  const status = String(getRootCI(body, "Status") ?? "").toUpperCase();
+  const notificationType =
+    typeof body.NotificationType === "string"
+      ? body.NotificationType.trim()
+      : String(getRootCI(body, "NotificationType") ?? "").trim();
+
   console.log("[tbank-notification] ok", {
-    OrderId: getRootCI(body, "OrderId"),
+    OrderId: orderIdRaw,
     PaymentId: getRootCI(body, "PaymentId"),
-    Status: getRootCI(body, "Status"),
+    Status: status,
     Success: getRootCI(body, "Success"),
     Amount: getRootCI(body, "Amount"),
-    NotificationType: getRootCI(body, "NotificationType"),
+    NotificationType: notificationType,
   });
+
+  const paid =
+    status === "CONFIRMED" ||
+    (body.Success === true &&
+      status !== "REJECTED" &&
+      status !== "CANCELED" &&
+      status !== "DEADLINE_EXPIRED" &&
+      status !== "AUTH_FAIL");
+
+  if (orderIdRaw && paid) {
+    try {
+      const sb = createServiceSupabase();
+      const firstPaid = await practicesMarkPaid(sb, orderIdRaw);
+      if (firstPaid) {
+        await sendPracticesPurchaseTelegram(orderIdRaw);
+      }
+    } catch (e) {
+      console.error("[tbank-notification] ledger error", e);
+    }
+  }
+
   return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 });

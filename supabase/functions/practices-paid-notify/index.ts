@@ -1,12 +1,12 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const TG_API = "https://api.telegram.org";
+import { sendPracticesPurchaseTelegram } from "../_shared/practicesPaidTelegram.ts";
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-const sentOrderIds = new Map<string, number>();
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -15,18 +15,10 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-function claimOrderNotify(orderId: string): boolean {
-  const now = Date.now();
-  for (const [id, t] of sentOrderIds) {
-    if (now - t > 86_400_000) sentOrderIds.delete(id);
-  }
-  if (sentOrderIds.has(orderId)) return false;
-  sentOrderIds.set(orderId, now);
-  return true;
-}
-
-function escapeHtml(s: string): string {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+function bearerToken(req: Request): string {
+  const h = req.headers.get("authorization")?.trim() || "";
+  if (!h.toLowerCase().startsWith("bearer ")) return "";
+  return h.slice(7).trim();
 }
 
 Deno.serve(async (req) => {
@@ -37,10 +29,13 @@ Deno.serve(async (req) => {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  const token = Deno.env.get("TELEGRAM_BOT_TOKEN")?.trim();
-  const chatId = Deno.env.get("TELEGRAM_CHANNEL_ID")?.trim();
-  if (!token || !chatId) {
-    return json({ error: "Server misconfigured" }, 500);
+  /** Раньше можно было звать безопаснее из браузера; уведомления теперь шлёт webhook. Это только ручной секретный вызов. */
+  const expected = Deno.env.get("PRACTICES_MANUAL_NOTIFY_SECRET")?.trim();
+  if (!expected) {
+    return json({ error: "Ручное уведомление отключено (задайте PRACTICES_MANUAL_NOTIFY_SECRET)." }, 410);
+  }
+  if (bearerToken(req) !== expected) {
+    return json({ error: "Forbidden" }, 403);
   }
 
   let body: Record<string, unknown> = {};
@@ -53,47 +48,7 @@ Deno.serve(async (req) => {
   if (!orderId) {
     return json({ ok: true, skipped: true });
   }
-  if (!claimOrderNotify(orderId)) {
-    return json({ ok: true, duplicate: true });
-  }
 
-  const html = [
-    "<b>Оплата «Сборники практик»</b>",
-    "",
-    `<b>OrderId:</b> <code>${escapeHtml(orderId)}</code>`,
-    "<b>Сумма на витрине:</b> 5 ₽",
-    `<b>Время (UTC):</b> <code>${escapeHtml(new Date().toISOString())}</code>`,
-  ].join("\n");
-
-  let tgRes: Response;
-  try {
-    tgRes = await fetch(`${TG_API}/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: html,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
-  } catch {
-    sentOrderIds.delete(orderId);
-    return json({ error: "Telegram unreachable" }, 502);
-  }
-
-  let tgJson: { ok?: boolean };
-  try {
-    tgJson = (await tgRes.json()) as { ok?: boolean };
-  } catch {
-    sentOrderIds.delete(orderId);
-    return json({ error: "Telegram delivery failed" }, 502);
-  }
-
-  if (!tgJson.ok) {
-    sentOrderIds.delete(orderId);
-    return json({ error: "Telegram rejected message" }, 502);
-  }
-
+  await sendPracticesPurchaseTelegram(orderId);
   return json({ ok: true });
 });

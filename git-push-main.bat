@@ -3,11 +3,14 @@ setlocal enabledelayedexpansion
 
 REM Всё уходит в main: коммит (если есть), merge текущей ветки ^-> main, push origin main, возврат на ветку.
 REM Запуск из корня репозитория.
-REM   git-push-main.bat
-REM   git-push-main.bat "сообщение коммита"
+REM   git-push-main.bat          ^(спросит комментарий к версии в консоли^)
+REM   git-push-main.bat "сообщение коммита"  ^(без запроса^)
 
 set "MSG=%~1"
-if "%MSG%"=="" set "MSG=Update project files"
+if "%MSG%"=="" (
+  set /p "MSG=Комментарий к версии ^(commit message^): "
+  if "!MSG!"=="" set "MSG=Update project files"
+)
 
 git rev-parse --is-inside-work-tree >nul 2>&1
 if errorlevel 1 (

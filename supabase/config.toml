@@ -441,7 +441,14 @@ entrypoint = "./functions/tbank-notification/index.ts"
 [functions.tochka-notification]
 enabled = true
 verify_jwt = false
+import_map = "./functions/tochka-notification/deno.json"
 entrypoint = "./functions/tochka-notification/index.ts"
+
+[functions.practices-access]
+enabled = true
+verify_jwt = true
+import_map = "./functions/practices-access/deno.json"
+entrypoint = "./functions/practices-access/index.ts"
 
 [functions.practices-paid-notify]
 enabled = true

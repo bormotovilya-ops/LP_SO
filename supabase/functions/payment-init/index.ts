@@ -237,10 +237,6 @@ Deno.serve(async (req) => {
     tochkaPayload.successUrl = joinReturn("ok");
     tochkaPayload.failUrl = joinReturn("fail");
   }
-  const functionsBase = (Deno.env.get("FUNCTIONS_BASE_URL")?.trim() || "").replace(/\/+$/, "");
-  if (functionsBase) {
-    tochkaPayload.callbackUrl = Deno.env.get("TOCHKA_CALLBACK_URL")?.trim() || `${functionsBase}/tochka-notification`;
-  }
 
   let tochkaRes: Response;
   try {
