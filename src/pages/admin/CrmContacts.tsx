@@ -772,10 +772,10 @@ export default function CrmContacts() {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-sm border border-hairline">
+        <div className="overflow-x-auto rounded-sm border border-hairline bg-muted/25 shadow-inner">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-b border-hairline bg-muted/55 hover:bg-muted/55">
                 <TableHead className="text-xs uppercase tracking-wider">Имя</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Телефон</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Email</TableHead>
@@ -787,9 +787,15 @@ export default function CrmContacts() {
                 <TableHead className="text-xs uppercase tracking-wider">Активность</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {pagedContacts.map((c) => (
-                <TableRow key={c.id}>
+            <TableBody className="[&_tr]:border-hairline/70">
+              {pagedContacts.map((c, rowIndex) => (
+                <TableRow
+                  key={c.id}
+                  className={cn(
+                    rowIndex % 2 === 0 ? "bg-background/85" : "bg-muted/35",
+                    "hover:bg-muted/55",
+                  )}
+                >
                   <TableCell>
                     <Link
                       to={`/admin/crm/contacts/${c.id}`}
