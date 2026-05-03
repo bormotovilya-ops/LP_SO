@@ -328,7 +328,9 @@ const QuizNumerology = () => {
           },
         }),
       });
+      const crmPayload = (await crmRes.json()) as { contact?: { id?: string } };
       if (!crmRes.ok) throw new Error("crm-upsert-failed");
+      const crmContactId = crmPayload.contact?.id;
 
       const message = [
         "Анкета после квиза",
@@ -363,6 +365,7 @@ const QuizNumerology = () => {
           utmCampaign: quizUtm.utmCampaign ?? undefined,
           utmContent: quizUtm.utmContent ?? undefined,
           utmTerm: quizUtm.utmTerm ?? undefined,
+          ...(crmContactId ? { crmContactId } : {}),
         }),
       });
 
@@ -381,6 +384,17 @@ const QuizNumerology = () => {
           title: "Откроем Telegram-бота",
           description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
         });
+        if (botCtxToken && phone.trim()) {
+          await fetch(functionsApiUrl("/crm-bot-attribution-token"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "attach_phone",
+              token: botCtxToken,
+              phone: phone.trim(),
+            }),
+          }).catch(() => undefined);
+        }
         window.open(
           buildTelegramBotUrl("razbor", { contextToken: botCtxToken ?? undefined }),
           "_blank",

@@ -8,6 +8,9 @@ const CORS_HEADERS = {
 };
 
 type Body = {
+  action?: string;
+  token?: string;
+  phone?: string;
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
@@ -54,6 +57,30 @@ Deno.serve(async (req) => {
     body = (await req.json()) as Body;
   } catch {
     return json({ error: "Invalid JSON payload" }, 400);
+  }
+
+  if (toNullableString(body.action) === "attach_phone") {
+    const token = toNullableString(body.token);
+    const phone = truncateField(toNullableString(body.phone), 40);
+    if (!token || !/^[a-f0-9]{12}$/i.test(token) || !phone) {
+      return json({ error: "token (12 hex) and phone are required" }, 400);
+    }
+    const client = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const t = token.toLowerCase();
+    const { data, error } = await client
+      .from("crm_bot_start_attribution")
+      .update({ phone })
+      .eq("token", t)
+      .select("token");
+    if (error) {
+      return json({ error: "Failed to attach phone", details: error.message }, 500);
+    }
+    if (!data?.length) {
+      return json({ error: "Token not found" }, 404);
+    }
+    return json({ ok: true }, 200);
   }
 
   const row = {

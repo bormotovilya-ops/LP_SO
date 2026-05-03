@@ -495,6 +495,7 @@ type BotAttributionRow = {
   utm_campaign: string | null;
   utm_content: string | null;
   utm_term: string | null;
+  phone: string | null;
 };
 
 async function fetchBotAttributionRow(
@@ -505,7 +506,7 @@ async function fetchBotAttributionRow(
   const t = token.toLowerCase();
   const { data, error } = await client
     .from("crm_bot_start_attribution")
-    .select("utm_source, utm_medium, utm_campaign, utm_content, utm_term")
+    .select("utm_source, utm_medium, utm_campaign, utm_content, utm_term, phone")
     .eq("token", t)
     .maybeSingle();
   if (error || !data) return null;
@@ -543,6 +544,7 @@ async function saveCrmBotEvent(
 
   const { error: upsertError } = await client.rpc("crm_upsert_contact", {
     p_full_name: fullName || null,
+    p_phone: attribution?.phone?.trim() || null,
     p_telegram_id: telegramId,
     p_source_channel: leadSourceChannel,
     p_source_detail: "telegram-webhook",

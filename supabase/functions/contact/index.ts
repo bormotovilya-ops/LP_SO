@@ -36,6 +36,10 @@ function normalizePhone(raw: string): string {
   return cleaned || raw.trim();
 }
 
+/** UUID уже созданный `crm-lead-upsert` — не вызываем второй upsert из этой функции (избегаем дублей контактов). */
+const CRM_CONTACT_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function pickStageCode(eventType: string): string {
   if (eventType === "quiz_completed") return "interest_confirmed";
   if (eventType === "gift_received") return "new_lead";
@@ -81,6 +85,7 @@ Deno.serve(async (req) => {
   const utmCampaign = String(body.utmCampaign ?? "").trim().slice(0, 512);
   const utmContent = String(body.utmContent ?? "").trim().slice(0, 512);
   const utmTerm = String(body.utmTerm ?? "").trim().slice(0, 512);
+  const crmContactIdIn = String(body.crmContactId ?? "").trim();
 
   if (!name || !contact) {
     return json({ error: "Invalid payload" }, 400);
@@ -138,25 +143,31 @@ Deno.serve(async (req) => {
       const telegramMatch = messenger.match(/@([a-zA-Z0-9_]{3,})/);
       const telegramHandle = telegramMatch ? `@${telegramMatch[1]}` : messenger || null;
 
-      const { data: resolvedContact } = await supabase.rpc("crm_upsert_contact", {
-        p_full_name: name || null,
-        p_phone: normalizedContact || null,
-        p_email: null,
-        p_telegram_id: null,
-        p_source_channel: "site",
-        p_source_detail: crmEventType || "diagnostic_request_submitted",
-        p_utm_source: utmSource || null,
-        p_utm_medium: utmMedium || null,
-        p_utm_campaign: utmCampaign || null,
-        p_utm_content: utmContent || null,
-        p_utm_term: utmTerm || null,
-        p_segment: giftTrack || null,
-        p_owner_user_id: null,
-        p_consent_personal_data: true,
-        p_comment: null,
-      });
+      let contactId: string | null = CRM_CONTACT_ID_RE.test(crmContactIdIn)
+        ? crmContactIdIn.toLowerCase()
+        : null;
 
-      const contactId = (resolvedContact as { id?: string } | null)?.id;
+      if (!contactId) {
+        const { data: resolvedContact } = await supabase.rpc("crm_upsert_contact", {
+          p_full_name: name || null,
+          p_phone: normalizedContact || null,
+          p_email: null,
+          p_telegram_id: null,
+          p_source_channel: "site",
+          p_source_detail: crmEventType || "diagnostic_request_submitted",
+          p_utm_source: utmSource || null,
+          p_utm_medium: utmMedium || null,
+          p_utm_campaign: utmCampaign || null,
+          p_utm_content: utmContent || null,
+          p_utm_term: utmTerm || null,
+          p_segment: giftTrack || null,
+          p_owner_user_id: null,
+          p_consent_personal_data: true,
+          p_comment: null,
+        });
+        contactId = (resolvedContact as { id?: string } | null)?.id ?? null;
+      }
+
       if (contactId) {
         await supabase.rpc("crm_add_interaction", {
           p_contact_id: contactId,
