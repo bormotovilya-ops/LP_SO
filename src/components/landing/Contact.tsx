@@ -38,6 +38,8 @@ export const Contact = () => {
           sourceDetail: "diagnostic_request",
           segment: "diagnostic",
           consentPersonalData: true,
+          /** Токен и contact_id на сервере в одном шаге — без гонки attach_* из браузера. */
+          mintBotLinkContext: true,
           interaction: {
             channel: "site_form",
             direction: "inbound",
@@ -55,56 +57,20 @@ export const Contact = () => {
         throw new Error(`CRM upsert failed: ${crmRes.status}`);
       }
 
-      const crmLead = (await crmRes.json()) as { contact?: { id?: string } };
+      const crmLead = (await crmRes.json()) as {
+        contact?: { id?: string } | Array<{ id?: string }>;
+        botContextToken?: string;
+      };
 
-      /** Как у квиза: один разовый токен `_ctx_` — webhook подставляет contact_id + телефон в crm_upsert_contact и не плодит второй контакт. */
+      const contactRow = Array.isArray(crmLead.contact) ? crmLead.contact[0] : crmLead.contact;
+      const UUID_RE = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
       const crmContactId =
-        typeof crmLead.contact?.id === "string" &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(crmLead.contact.id)
-          ? crmLead.contact.id.toLowerCase()
+        typeof contactRow?.id === "string" && UUID_RE.test(contactRow.id)
+          ? contactRow.id.toLowerCase()
           : undefined;
 
-      let diagnosticBotCtx: string | undefined;
-      try {
-        const tokRes = await fetch(functionsApiUrl("/crm-bot-attribution-token"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            utmSource: "site_form",
-            utmCampaign: "diagnostic",
-          }),
-        });
-        const tokBody = (await tokRes.json().catch(() => ({}))) as { token?: string };
-        if (tokRes.ok && typeof tokBody.token === "string") {
-          diagnosticBotCtx = tokBody.token.toLowerCase();
-          await Promise.all([
-            crmContactId
-              ? fetch(functionsApiUrl("/crm-bot-attribution-token"), {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    action: "attach_contact",
-                    token: diagnosticBotCtx,
-                    contactId: crmContactId,
-                  }),
-                }).catch(() => undefined)
-              : Promise.resolve(),
-            contact.trim()
-              ? fetch(functionsApiUrl("/crm-bot-attribution-token"), {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    action: "attach_phone",
-                    token: diagnosticBotCtx,
-                    phone: contact.trim(),
-                  }),
-                }).catch(() => undefined)
-              : Promise.resolve(),
-          ]);
-        }
-      } catch {
-        /* если токен не выдался — открываем бота как раньше (fallback) */
-      }
+      const diagnosticBotCtx =
+        typeof crmLead.botContextToken === "string" ? crmLead.botContextToken.toLowerCase() : undefined;
 
       const botUrl = buildTelegramBotUrl("diagnostic", { contextToken: diagnosticBotCtx });
 

@@ -23,6 +23,11 @@ type LeadPayload = {
   ownerUserId?: string;
   consentPersonalData?: boolean;
   comment?: string;
+  /**
+   * Создать строку в `crm_bot_start_attribution` сразу с contact_id + phone (не гоняя attach_* с браузера).
+   * Нужно для слияния при /start в боте (иначе возможен второй crm_contact только с telegram_id).
+   */
+  mintBotLinkContext?: boolean;
   interaction?: {
     channel?: string;
     direction?: "inbound" | "outbound" | "internal";
@@ -48,6 +53,73 @@ function toNullableBigint(raw: unknown): number | null {
   if (typeof raw === "number" && Number.isInteger(raw)) return raw;
   if (typeof raw === "string" && raw.trim() && /^-?\d+$/.test(raw.trim())) {
     return Number(raw.trim());
+  }
+  return null;
+}
+
+function randomHexToken(): string {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function truncateField(raw: string | null, max: number): string | null {
+  if (!raw) return null;
+  return raw.length <= max ? raw : raw.slice(0, max);
+}
+
+/** PostgREST иногда возвращает composite как один объект или массив из одного элемента. */
+function extractContactId(contact: unknown): string | null {
+  if (!contact) return null;
+  const row = Array.isArray(contact) ? contact[0] : contact;
+  if (!row || typeof row !== "object") return null;
+  const id = (row as { id?: unknown }).id;
+  if (typeof id !== "string") return null;
+  const t = id.trim().toLowerCase();
+  return /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/.test(t) ? t : null;
+}
+
+async function mintBotLinkContextRow(
+  client: ReturnType<typeof createClient>,
+  opts: {
+    contactId: string;
+    phone: string | null;
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
+    utmContent: string | null;
+    utmTerm: string | null;
+  },
+): Promise<string | null> {
+  const phone = truncateField(opts.phone?.trim() ?? null, 40);
+
+  let utm_source = truncateField(opts.utmSource ?? null, 512);
+  let utm_medium = truncateField(opts.utmMedium ?? null, 512);
+  let utm_campaign = truncateField(opts.utmCampaign ?? null, 512);
+  const utm_content = truncateField(opts.utmContent ?? null, 512);
+  const utm_term = truncateField(opts.utmTerm ?? null, 512);
+
+  if (!utm_source && !utm_medium && !utm_campaign && !utm_content && !utm_term) {
+    utm_source = "site_form";
+    utm_campaign = "diagnostic";
+  }
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const token = randomHexToken();
+    const { error } = await client.from("crm_bot_start_attribution").insert({
+      token,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_content,
+      utm_term,
+      phone,
+      contact_id: opts.contactId,
+    });
+    if (!error) return token;
+    if ((error as { code?: string }).code === "23505") continue;
+    console.error("[crm-lead-upsert] mintBotLinkContextRow:", error.message);
+    return null;
   }
   return null;
 }
@@ -96,9 +168,32 @@ Deno.serve(async (req) => {
     return json({ error: "Failed to upsert lead", details: upsertError.message }, 400);
   }
 
-  if (body.interaction && contact?.id) {
+  let botContextToken: string | null = null;
+  if (body.mintBotLinkContext) {
+    const cid = extractContactId(contact);
+    if (cid) {
+      botContextToken = await mintBotLinkContextRow(client, {
+        contactId: cid,
+        phone: toNullableString(body.phone),
+        utmSource: toNullableString(body.utmSource),
+        utmMedium: toNullableString(body.utmMedium),
+        utmCampaign: toNullableString(body.utmCampaign),
+        utmContent: toNullableString(body.utmContent),
+        utmTerm: toNullableString(body.utmTerm),
+      });
+      if (!botContextToken) {
+        console.warn("[crm-lead-upsert] mintBotLinkContext: token not created (see errors above)");
+      }
+    } else {
+      console.warn("[crm-lead-upsert] mintBotLinkContext: could not read contact id from RPC result");
+    }
+  }
+
+  const contactId = extractContactId(contact);
+
+  if (body.interaction && contactId) {
     const { error: interactionError } = await client.rpc("crm_add_interaction", {
-      p_contact_id: contact.id,
+      p_contact_id: contactId,
       p_channel: toNullableString(body.interaction.channel) ?? "unknown",
       p_direction: toNullableString(body.interaction.direction) ?? "internal",
       p_interaction_type: toNullableString(body.interaction.type) ?? "lead_capture",
@@ -111,11 +206,12 @@ Deno.serve(async (req) => {
           error: "Lead saved but interaction failed",
           contact,
           details: interactionError.message,
+          ...(botContextToken ? { botContextToken } : {}),
         },
         207,
       );
     }
   }
 
-  return json({ ok: true, contact }, 200);
+  return json({ ok: true, contact, ...(botContextToken ? { botContextToken } : {}) }, 200);
 });
