@@ -1,12 +1,84 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import { buildTelegramBotUrl, getTelegramBotUsername } from "@/lib/botLinks";
+import {
+  captureQuizUtmsFromLocation,
+  computeQuizAttributionBootstrap,
+  hasAnyUtm,
+  loadCachedBotContextToken,
+  loadStoredQuizUtm,
+  mergeSessionQuizUtms,
+  persistBotContextToken,
+  persistQuizUtm,
+  utmFingerprint,
+} from "@/lib/quizAttribution";
 
 export const Contact = () => {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [siteUtm, setSiteUtm] = useState(() => computeQuizAttributionBootstrap().merged);
+  const [botCtxToken, setBotCtxToken] = useState<string | null>(() => computeQuizAttributionBootstrap().botCtxToken);
+  const [botCtxResolved, setBotCtxResolved] = useState(() => computeQuizAttributionBootstrap().botCtxResolved);
+
+  useEffect(() => {
+    const merged = mergeSessionQuizUtms(loadStoredQuizUtm(), captureQuizUtmsFromLocation());
+    if (hasAnyUtm(merged)) persistQuizUtm(merged);
+    setSiteUtm(merged);
+
+    if (!hasAnyUtm(merged)) {
+      setBotCtxToken(null);
+      setBotCtxResolved(true);
+      return;
+    }
+
+    const fp = utmFingerprint(merged);
+    const cached = loadCachedBotContextToken(fp);
+    if (cached) {
+      setBotCtxToken(cached);
+      setBotCtxResolved(true);
+      return;
+    }
+
+    setBotCtxResolved(false);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(functionsApiUrl("/crm-bot-attribution-token"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            utmSource: merged.utmSource ?? null,
+            utmMedium: merged.utmMedium ?? null,
+            utmCampaign: merged.utmCampaign ?? null,
+            utmContent: merged.utmContent ?? null,
+            utmTerm: merged.utmTerm ?? null,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { token?: string };
+        if (!cancelled && res.ok && typeof data.token === "string") {
+          const tok = data.token.toLowerCase();
+          setBotCtxToken(tok);
+          persistBotContextToken(fp, tok);
+        }
+      } catch {
+        /* бот откроется без _ctx_, как после квиза */
+      } finally {
+        if (!cancelled) setBotCtxResolved(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const diagnosticLinkBlocked = useMemo(() => hasAnyUtm(siteUtm) && !botCtxResolved, [siteUtm, botCtxResolved]);
+  const diagnosticBotLinkHref = useMemo(
+    () => buildTelegramBotUrl("diagnostic", { contextToken: botCtxToken ?? undefined }),
+    [botCtxToken],
+  );
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -30,6 +102,11 @@ export const Contact = () => {
           sourceDetail: "diagnostic_request",
           segment: "diagnostic",
           consentPersonalData: true,
+          utmSource: siteUtm.utmSource ?? undefined,
+          utmMedium: siteUtm.utmMedium ?? undefined,
+          utmCampaign: siteUtm.utmCampaign ?? undefined,
+          utmContent: siteUtm.utmContent ?? undefined,
+          utmTerm: siteUtm.utmTerm ?? undefined,
           /** Токен и contact_id на сервере в одном шаге — без гонки attach_* из браузера. */
           mintBotLinkContext: true,
           interaction: {
@@ -72,6 +149,11 @@ export const Contact = () => {
           goal,
           message,
           crmEventType: "diagnostic_request_submitted",
+          utmSource: siteUtm.utmSource ?? undefined,
+          utmMedium: siteUtm.utmMedium ?? undefined,
+          utmCampaign: siteUtm.utmCampaign ?? undefined,
+          utmContent: siteUtm.utmContent ?? undefined,
+          utmTerm: siteUtm.utmTerm ?? undefined,
           ...(crmContactId ? { crmContactId } : {}),
         }),
       });
@@ -178,19 +260,30 @@ export const Contact = () => {
 
           <div className="mt-4 space-y-1.5 text-[11px] leading-relaxed text-muted-foreground md:max-w-lg">
             <p>
-              <a
-                href={buildTelegramBotUrl("diagnostic")}
-                target="_blank"
-                rel="noreferrer"
-                className="text-accent underline-offset-2 hover:underline"
-              >
-                @{getTelegramBotUsername()}
-              </a>
-              {" — "}открывает бота по ссылке вида{" "}
-              <span className="whitespace-nowrap text-foreground/80">t.me/…?start=…</span>
-              {": "}
-              это стандартный deep link — Telegram сам отправляет в чат команду{" "}
-              <span className="whitespace-nowrap text-foreground/80">/start</span> с параметром сценария.
+              {diagnosticLinkBlocked ? (
+                <span className="text-muted-foreground">Готовим ссылку в бота с меткой перехода (реклама / источник)…</span>
+              ) : (
+                <a
+                  href={diagnosticBotLinkHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-accent underline-offset-2 hover:underline"
+                >
+                  @{getTelegramBotUsername()}
+                </a>
+              )}
+              {!diagnosticLinkBlocked && (
+                <>
+                  {" — "}открывает бота по ссылке вида{" "}
+                  <span className="whitespace-nowrap text-foreground/80">t.me/…?start=…</span>
+                  {": "}
+                  это стандартный deep link — Telegram сам отправляет в чат команду{" "}
+                  <span className="whitespace-nowrap text-foreground/80">/start</span> с параметром сценария.
+                  {hasAnyUtm(siteUtm)
+                    ? " UTM из адреса страницы передаются при /start через серверную метку (как после квиза)."
+                    : null}
+                </>
+              )}
             </p>
             <p>
               После перехода по ссылке <strong className="font-medium text-foreground/90">/start выполнится автоматически</strong>

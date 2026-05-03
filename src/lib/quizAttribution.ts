@@ -1,4 +1,4 @@
-/** UTM с URL квиза; храним в sessionStorage на время сессии. */
+/** UTM с URL сайта (квиз, лендинг с формой диагностики); sessionStorage на время сессии. */
 
 export type StoredQuizUtm = {
   utmSource?: string | null;
