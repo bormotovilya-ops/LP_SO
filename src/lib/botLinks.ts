@@ -8,6 +8,11 @@ function getBotUsername(): string {
   return fromEnv || DEFAULT_BOT_USERNAME;
 }
 
+/** Имя бота без @ (для ссылок t.me/username и подписей на лендинге). */
+export function getTelegramBotUsername(): string {
+  return getBotUsername();
+}
+
 function buildStartPayload(intent: BotIntent, giftTrack?: GiftTrack): string {
   // Telegram `start` payload format is limited, so keep it compact and parseable.
   if (intent === "present" && giftTrack) {
@@ -22,7 +27,10 @@ function appendAttributionToken(basePayload: string, contextToken?: string): str
   return `${basePayload}_ctx_${trimmed}`;
 }
 
-/** Для квиза: UTM передаются в CRM через токен `_ctx_…` (см. Edge `crm-bot-attribution-token` и telegram-webhook). */
+/**
+ * Deep link Telegram: всегда `https://t.me/<bot>?start=<payload>…`.
+ * Параметр `start` — это и есть переданная с сервера команда /start с payload (до 64 символов).
+ */
 export function buildTelegramBotUrl(
   intent: BotIntent,
   options?: { giftTrack?: GiftTrack; contextToken?: string },
@@ -30,13 +38,13 @@ export function buildTelegramBotUrl(
   const base = buildStartPayload(intent, options?.giftTrack);
   const startPayload = appendAttributionToken(base, options?.contextToken);
 
-  const params = new URLSearchParams({ start: startPayload });
+  const q: string[] = [`start=${encodeURIComponent(startPayload)}`];
   if (!startPayload.includes("_ctx_")) {
-    params.set("utm_source", "site");
-    params.set("utm_campaign", intent);
+    q.push(`utm_source=${encodeURIComponent("site")}`);
+    q.push(`utm_campaign=${encodeURIComponent(intent)}`);
   }
 
-  return `https://t.me/${getBotUsername()}?${params.toString()}`;
+  return `https://t.me/${getBotUsername()}?${q.join("&")}`;
 }
 
 /**

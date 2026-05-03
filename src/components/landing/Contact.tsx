@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
-import { buildTelegramBotUrl } from "@/lib/botLinks";
+import { buildTelegramBotUrl, getTelegramBotUsername } from "@/lib/botLinks";
 
 export const Contact = () => {
   const { toast } = useToast();
@@ -176,7 +176,30 @@ export const Contact = () => {
             {submitting ? "Отправляем..." : "Отправить заявку"}
           </button>
 
-          <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
+          <div className="mt-4 space-y-1.5 text-[11px] leading-relaxed text-muted-foreground md:max-w-lg">
+            <p>
+              <a
+                href={buildTelegramBotUrl("diagnostic")}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent underline-offset-2 hover:underline"
+              >
+                @{getTelegramBotUsername()}
+              </a>
+              {" — "}открывает бота по ссылке вида{" "}
+              <span className="whitespace-nowrap text-foreground/80">t.me/…?start=…</span>
+              {": "}
+              это стандартный deep link — Telegram сам отправляет в чат команду{" "}
+              <span className="whitespace-nowrap text-foreground/80">/start</span> с параметром сценария.
+            </p>
+            <p>
+              После перехода по ссылке <strong className="font-medium text-foreground/90">/start выполнится автоматически</strong>
+              {" "}— вводить её вручную не нужно. После успешной отправки заявки откроется та же механика, но с вашей меткой заявки в
+              параметре <span className="whitespace-nowrap text-foreground/80">start</span>.
+            </p>
+          </div>
+
+          <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
             Нажимая кнопку, вы соглашаетесь с{" "}
             <Link to="/oferta" className="text-accent underline-offset-2 hover:underline">
               публичной офертой
