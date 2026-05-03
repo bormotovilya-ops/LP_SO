@@ -19,17 +19,6 @@ export const Contact = () => {
     const goal = String(formData.get("goal") ?? "").trim();
     const message = String(formData.get("message") ?? "").trim();
 
-    /**
-     * Пустая вкладка по клику, потом подставляем URL бота (обход части блокировок всплывающих окон).
-     * Важно: без `noopener` — иначе у многих браузеров opener не может сделать `location` на t.me, вкладка залипает на about:blank.
-     */
-    let botTab: Window | null = null;
-    try {
-      botTab = window.open("about:blank", "_blank");
-    } catch {
-      botTab = null;
-    }
-
     try {
       const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
         method: "POST",
@@ -56,111 +45,62 @@ export const Contact = () => {
         }),
       });
       if (!crmRes.ok) {
-        botTab?.close();
         throw new Error(`CRM upsert failed: ${crmRes.status}`);
       }
 
-      const crmLead = (await crmRes.json()) as {
+      /** Как `submitApplication` в QuizNumerology: тот же порядок тостов и тот же window.open. */
+      const crmPayload = (await crmRes.json()) as {
         contact?: { id?: string } | Array<{ id?: string }>;
         botContextToken?: string;
       };
-
-      const contactRow = Array.isArray(crmLead.contact) ? crmLead.contact[0] : crmLead.contact;
-      const UUID_RE = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
-      const crmContactId =
-        typeof contactRow?.id === "string" && UUID_RE.test(contactRow.id)
-          ? contactRow.id.toLowerCase()
-          : undefined;
+      const contactRow = Array.isArray(crmPayload.contact) ? crmPayload.contact[0] : crmPayload.contact;
+      const crmContactId = contactRow?.id;
 
       const diagnosticBotCtx =
-        typeof crmLead.botContextToken === "string" ? crmLead.botContextToken.toLowerCase() : undefined;
+        typeof crmPayload.botContextToken === "string" ? crmPayload.botContextToken.toLowerCase() : undefined;
 
-      const botUrl = buildTelegramBotUrl("diagnostic", { contextToken: diagnosticBotCtx });
+      const res = await fetch(functionsApiUrl("/contact"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
+        },
+        body: JSON.stringify({
+          name,
+          contact,
+          messenger,
+          goal,
+          message,
+          crmEventType: "diagnostic_request_submitted",
+          ...(crmContactId ? { crmContactId } : {}),
+        }),
+      });
 
-      let telegramChannelDelivered = false;
-      try {
-        const res = await fetch(functionsApiUrl("/contact"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
-          },
-          body: JSON.stringify({
-            name,
-            contact,
-            messenger,
-            goal,
-            message,
-            crmEventType: "diagnostic_request_submitted",
-            ...(crmContactId ? { crmContactId } : {}),
-          }),
-        });
-        let body: unknown = {};
-        try {
-          body = await res.json();
-        } catch {
-          body = {};
-        }
-        telegramChannelDelivered =
-          res.ok &&
-          typeof body === "object" &&
-          body !== null &&
-          (body as { ok?: unknown }).ok === true;
-      } catch {
-        telegramChannelDelivered = false;
-      }
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
 
-      let botOpened = false;
-      if (botTab && !botTab.closed) {
-        try {
-          botTab.location.href = botUrl;
-          botOpened = true;
-        } catch {
-          try {
-            botTab.location.replace(botUrl);
-            botOpened = true;
-          } catch {
-            try {
-              botTab.close();
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-      }
-      if (!botOpened) {
-        const w = window.open(botUrl, "_blank");
-        botOpened = Boolean(w);
-      }
-      if (!botOpened) {
+      if (!res.ok || data.ok !== true) {
         toast({
-          title: "Откройте бота вручную",
-          description: `${botUrl} — скопируйте ссылку или найдите бота по имени в Telegram.`,
-        });
-      }
-
-      if (telegramChannelDelivered) {
-        toast({
-          title: "Заявка отправлена",
-          description: "Мы свяжемся с вами по указанным контактам.",
-        });
-        toast({
-          title: "Откроем Telegram-бота",
-          description: botOpened
-            ? "Отдельная вкладка с ботом уже открыта — после перехода сценарий начнётся автоматически."
-            : "Используйте ссылку из предыдущего сообщения или откройте бота вручную.",
+          title: "Анкета сохранена в CRM",
+          description: "Заявка в Telegram временно не отправлена.",
         });
       } else {
         toast({
-          title: "Заявка сохранена в CRM",
-          description: botOpened
-            ? "Сообщение в рабочий Telegram временно не доставлено. В другой вкладке уже открыт бот — там продолжите сценарий."
-            : "Сообщение в рабочий Telegram временно не доставлено (канал или токен бота). Если вкладку с ботом не удалось открыть — см. предыдущее уведомление со ссылкой.",
+          title: "Анкета отправлена",
+          description: "Спасибо! Светлана свяжется с вами по указанным контактам.",
         });
+        toast({
+          title: "Откроем Telegram-бота",
+          description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
+        });
+        window.open(
+          buildTelegramBotUrl("diagnostic", { contextToken: diagnosticBotCtx }),
+          "_blank",
+          "noopener,noreferrer",
+        );
       }
+
       form.reset();
     } catch {
-      botTab?.close();
       toast({
         title: "Не удалось отправить",
         description: "Попробуйте позже или напишите в Telegram.",
