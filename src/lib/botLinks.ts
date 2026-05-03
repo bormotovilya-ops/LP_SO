@@ -16,12 +16,25 @@ function buildStartPayload(intent: BotIntent, giftTrack?: GiftTrack): string {
   return `src_site_goal_${intent}`;
 }
 
-export function buildTelegramBotUrl(intent: BotIntent, options?: { giftTrack?: GiftTrack }): string {
-  const params = new URLSearchParams({
-    start: buildStartPayload(intent, options?.giftTrack),
-    utm_source: "site",
-    utm_campaign: intent,
-  });
+function appendAttributionToken(basePayload: string, contextToken?: string): string {
+  const trimmed = contextToken?.trim().toLowerCase();
+  if (!trimmed || !/^[a-f0-9]{12}$/.test(trimmed)) return basePayload;
+  return `${basePayload}_ctx_${trimmed}`;
+}
+
+/** Для квиза: UTM передаются в CRM через токен `_ctx_…` (см. Edge `crm-bot-attribution-token` и telegram-webhook). */
+export function buildTelegramBotUrl(
+  intent: BotIntent,
+  options?: { giftTrack?: GiftTrack; contextToken?: string },
+): string {
+  const base = buildStartPayload(intent, options?.giftTrack);
+  const startPayload = appendAttributionToken(base, options?.contextToken);
+
+  const params = new URLSearchParams({ start: startPayload });
+  if (!startPayload.includes("_ctx_")) {
+    params.set("utm_source", "site");
+    params.set("utm_campaign", intent);
+  }
 
   return `https://t.me/${getBotUsername()}?${params.toString()}`;
 }

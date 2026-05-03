@@ -76,6 +76,11 @@ Deno.serve(async (req) => {
     .slice(0, 80);
   const quizNumber = body.quizNumber;
   const giftTrack = String(body.giftTrack ?? "").trim().slice(0, 40);
+  const utmSource = String(body.utmSource ?? "").trim().slice(0, 512);
+  const utmMedium = String(body.utmMedium ?? "").trim().slice(0, 512);
+  const utmCampaign = String(body.utmCampaign ?? "").trim().slice(0, 512);
+  const utmContent = String(body.utmContent ?? "").trim().slice(0, 512);
+  const utmTerm = String(body.utmTerm ?? "").trim().slice(0, 512);
 
   if (!name || !contact) {
     return json({ error: "Invalid payload" }, 400);
@@ -140,11 +145,11 @@ Deno.serve(async (req) => {
         p_telegram_id: null,
         p_source_channel: "site",
         p_source_detail: crmEventType || "diagnostic_request_submitted",
-        p_utm_source: null,
-        p_utm_medium: null,
-        p_utm_campaign: null,
-        p_utm_content: null,
-        p_utm_term: null,
+        p_utm_source: utmSource || null,
+        p_utm_medium: utmMedium || null,
+        p_utm_campaign: utmCampaign || null,
+        p_utm_content: utmContent || null,
+        p_utm_term: utmTerm || null,
         p_segment: giftTrack || null,
         p_owner_user_id: null,
         p_consent_personal_data: true,

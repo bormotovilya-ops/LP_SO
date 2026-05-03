@@ -6,7 +6,7 @@ const TG_API = "https://api.telegram.org";
 type StartIntent = "diagnostic" | "present" | "razbor";
 type GiftTrack = "fear" | "money" | "relations";
 type JsonObject = Record<string, unknown>;
-type StartPayload = { intent: StartIntent; giftTrack: GiftTrack | null };
+type StartPayload = { intent: StartIntent; giftTrack: GiftTrack | null; attributionToken: string | null };
 type GiftContent = { title: string };
 
 function json(data: unknown, status = 200): Response {
@@ -17,23 +17,38 @@ function json(data: unknown, status = 200): Response {
 }
 
 function parseStartPayload(payload: string): StartPayload | null {
-  const match = /^src_site_goal_(diagnostic|present|razbor)(?:_(fear|money|relations))?$/i.exec(payload.trim());
+  const trimmed = payload.trim();
+  let attributionToken: string | null = null;
+  let core = trimmed;
+  const ctxMarker = "_ctx_";
+  const ctxIdx = trimmed.lastIndexOf(ctxMarker);
+  if (ctxIdx !== -1) {
+    const maybeTok = trimmed.slice(ctxIdx + ctxMarker.length);
+    if (/^[a-f0-9]{12}$/i.test(maybeTok)) {
+      attributionToken = maybeTok.toLowerCase();
+      core = trimmed.slice(0, ctxIdx);
+    }
+  }
+  const match = /^src_site_goal_(diagnostic|present|razbor)(?:_(fear|money|relations))?$/i.exec(core);
   if (!match) return null;
   return {
     intent: match[1].toLowerCase() as StartIntent,
     giftTrack: (match[2]?.toLowerCase() as GiftTrack | undefined) ?? null,
+    attributionToken,
   };
 }
 
-function getStartPayload(update: JsonObject): StartPayload | null {
+function getStartPayload(update: JsonObject): StartPayload {
   const message = update.message;
-  if (!message || typeof message !== "object") return { intent: "diagnostic", giftTrack: null };
+  if (!message || typeof message !== "object") {
+    return { intent: "diagnostic", giftTrack: null, attributionToken: null };
+  }
   const maybeText = (message as JsonObject).text;
   const text = typeof maybeText === "string" ? maybeText : "";
-  if (!text.startsWith("/start")) return { intent: "diagnostic", giftTrack: null };
+  if (!text.startsWith("/start")) return { intent: "diagnostic", giftTrack: null, attributionToken: null };
   const payload = text.replace("/start", "").trim();
-  if (!payload) return { intent: "diagnostic", giftTrack: null };
-  return parseStartPayload(payload) ?? { intent: "diagnostic", giftTrack: null };
+  if (!payload) return { intent: "diagnostic", giftTrack: null, attributionToken: null };
+  return parseStartPayload(payload) ?? { intent: "diagnostic", giftTrack: null, attributionToken: null };
 }
 
 function isStartCommand(update: JsonObject): boolean {
@@ -474,10 +489,34 @@ async function deliverPracticesCollectionFromChannel(
   return { paid: true, copyDelivered };
 }
 
+type BotAttributionRow = {
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+};
+
+async function fetchBotAttributionRow(
+  client: SupabaseClient,
+  token: string | null,
+): Promise<BotAttributionRow | null> {
+  if (!token || !/^[a-f0-9]{12}$/i.test(token)) return null;
+  const t = token.toLowerCase();
+  const { data, error } = await client
+    .from("crm_bot_start_attribution")
+    .select("utm_source, utm_medium, utm_campaign, utm_content, utm_term")
+    .eq("token", t)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as BotAttributionRow;
+}
+
 async function saveCrmBotEvent(
   update: JsonObject,
   intent: StartIntent | null,
   giftTrack: GiftTrack | null,
+  attributionToken: string | null,
 ): Promise<void> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -497,14 +536,30 @@ async function saveCrmBotEvent(
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  await client.rpc("crm_upsert_contact", {
+  const attribution = await fetchBotAttributionRow(client, attributionToken);
+
+  const { error: upsertError } = await client.rpc("crm_upsert_contact", {
     p_full_name: fullName || null,
     p_telegram_id: telegramId,
     p_source_channel: "bot",
     p_source_detail: "telegram-webhook",
     p_segment: giftTrack ?? null,
     p_comment: "Создано/обновлено из telegram-webhook",
+    p_utm_source: attribution?.utm_source ?? null,
+    p_utm_medium: attribution?.utm_medium ?? null,
+    p_utm_campaign: attribution?.utm_campaign ?? null,
+    p_utm_content: attribution?.utm_content ?? null,
+    p_utm_term: attribution?.utm_term ?? null,
   });
+
+  if (upsertError) {
+    console.error("[telegram-webhook] crm_upsert_contact failed:", upsertError.message);
+    return;
+  }
+
+  if (attribution && attributionToken && /^[a-f0-9]{12}$/i.test(attributionToken)) {
+    await client.from("crm_bot_start_attribution").delete().eq("token", attributionToken.toLowerCase());
+  }
 
   const { data: contacts } = await client
     .from("crm_contacts")
@@ -523,6 +578,7 @@ async function saveCrmBotEvent(
       text,
       intent: intent ?? "unknown",
       giftTrack: giftTrack ?? "default",
+      attribution: attribution,
       update,
     },
   });
@@ -621,8 +677,8 @@ Deno.serve(async (req) => {
   }
 
   const startPayload = getStartPayload(update);
-  const intent = startPayload?.intent ?? null;
-  const giftTrack = startPayload?.giftTrack ?? null;
+  const intent = startPayload.intent ?? null;
+  const giftTrack = startPayload.giftTrack ?? null;
   const from = getMessageFrom(update);
   const chatId = getChatId(update);
   if (!chatId) return json({ ok: true, skipped: true });
@@ -665,7 +721,7 @@ Deno.serve(async (req) => {
     await notifyChannel(token, channelId, intent, giftTrack, from);
   }
 
-  await saveCrmBotEvent(update, intent, giftTrack);
+  await saveCrmBotEvent(update, intent, giftTrack, startPayload.attributionToken);
 
   return json({ ok: true, intent: intent ?? "unknown" }, 200);
 });

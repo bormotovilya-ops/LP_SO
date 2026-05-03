@@ -12,6 +12,18 @@ import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { useToast } from "@/hooks/use-toast";
 import { functionsApiUrl } from "@/lib/functionsApi";
 import { buildTelegramBotUrl } from "@/lib/botLinks";
+import {
+  captureQuizUtmsFromLocation,
+  computeQuizAttributionBootstrap,
+  hasAnyUtm,
+  loadCachedBotContextToken,
+  loadStoredQuizUtm,
+  mergeSessionQuizUtms,
+  persistBotContextToken,
+  persistQuizUtm,
+  utmFingerprint,
+  type StoredQuizUtm,
+} from "@/lib/quizAttribution";
 import { cn } from "@/lib/utils";
 import quizPortrait from "../../old/IMG_2474.jpeg";
 
@@ -191,10 +203,67 @@ const QuizNumerology = () => {
   const [sending, setSending] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
+  const [quizUtm, setQuizUtm] = useState<StoredQuizUtm>(() => computeQuizAttributionBootstrap().merged);
+  const [botCtxToken, setBotCtxToken] = useState<string | null>(() => computeQuizAttributionBootstrap().botCtxToken);
+  const [botCtxResolved, setBotCtxResolved] = useState(() => computeQuizAttributionBootstrap().botCtxResolved);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
+
+  useEffect(() => {
+    const merged = mergeSessionQuizUtms(loadStoredQuizUtm(), captureQuizUtmsFromLocation());
+    if (hasAnyUtm(merged)) persistQuizUtm(merged);
+    setQuizUtm(merged);
+
+    if (!hasAnyUtm(merged)) {
+      setBotCtxToken(null);
+      setBotCtxResolved(true);
+      return;
+    }
+
+    const fp = utmFingerprint(merged);
+    const cached = loadCachedBotContextToken(fp);
+    if (cached) {
+      setBotCtxToken(cached);
+      setBotCtxResolved(true);
+      return;
+    }
+
+    setBotCtxResolved(false);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(functionsApiUrl("/crm-bot-attribution-token"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            utmSource: merged.utmSource ?? null,
+            utmMedium: merged.utmMedium ?? null,
+            utmCampaign: merged.utmCampaign ?? null,
+            utmContent: merged.utmContent ?? null,
+            utmTerm: merged.utmTerm ?? null,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { token?: string };
+        if (!cancelled && res.ok && typeof data.token === "string") {
+          const tok = data.token.toLowerCase();
+          setBotCtxToken(tok);
+          persistBotContextToken(fp, tok);
+        }
+      } catch {
+        /* после разблокировки бот откроется без ctx */
+      } finally {
+        if (!cancelled) setBotCtxResolved(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const attributionGateBlocked = useMemo(() => hasAnyUtm(quizUtm) && !botCtxResolved, [quizUtm, botCtxResolved]);
 
   const focusLabel = useMemo(
     () => (focus ? focusOptions.find((f) => f.key === focus)?.label : null),
@@ -234,6 +303,11 @@ const QuizNumerology = () => {
           sourceChannel: "quiz_form",
           sourceDetail: "quiz_review_request",
           segment: focus ?? null,
+          utmSource: quizUtm.utmSource ?? undefined,
+          utmMedium: quizUtm.utmMedium ?? undefined,
+          utmCampaign: quizUtm.utmCampaign ?? undefined,
+          utmContent: quizUtm.utmContent ?? undefined,
+          utmTerm: quizUtm.utmTerm ?? undefined,
           consentPersonalData: true,
           interaction: {
             channel: "quiz_form",
@@ -279,6 +353,11 @@ const QuizNumerology = () => {
           crmEventType: "quiz_completed",
           quizNumber,
           giftTrack: focus ?? null,
+          utmSource: quizUtm.utmSource ?? undefined,
+          utmMedium: quizUtm.utmMedium ?? undefined,
+          utmCampaign: quizUtm.utmCampaign ?? undefined,
+          utmContent: quizUtm.utmContent ?? undefined,
+          utmTerm: quizUtm.utmTerm ?? undefined,
         }),
       });
 
@@ -297,7 +376,11 @@ const QuizNumerology = () => {
           title: "Откроем Telegram-бота",
           description: "После открытия бота обязательно нажмите Start, чтобы заявка закрепилась.",
         });
-        window.open(buildTelegramBotUrl("razbor"), "_blank", "noopener,noreferrer");
+        window.open(
+          buildTelegramBotUrl("razbor", { contextToken: botCtxToken ?? undefined }),
+          "_blank",
+          "noopener,noreferrer",
+        );
       }
       setName("");
       setPhone("");
@@ -533,10 +616,11 @@ const QuizNumerology = () => {
                         <div className="flex min-h-0 flex-col">
                           <button
                             type="button"
+                            disabled={attributionGateBlocked}
                             onClick={openBookingForm}
-                            className="inline-flex min-h-11 w-full items-center justify-center border border-accent bg-accent px-3 py-2.5 text-[11px] font-medium uppercase leading-tight tracking-[0.16em] text-accent-foreground shadow-sm transition-colors hover:bg-accent/90 sm:min-h-[3rem] sm:text-xs sm:tracking-[0.18em]"
+                            className="inline-flex min-h-11 w-full items-center justify-center border border-accent bg-accent px-3 py-2.5 text-[11px] font-medium uppercase leading-tight tracking-[0.16em] text-accent-foreground shadow-sm transition-colors hover:bg-accent/90 disabled:pointer-events-none disabled:opacity-45 sm:min-h-[3rem] sm:text-xs sm:tracking-[0.18em]"
                           >
-                            Записаться на разбор
+                            {attributionGateBlocked ? "Подождите…" : "Записаться на разбор"}
                           </button>
                           {!showBookingForm && (
                             <p className="mt-1.5 text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">
@@ -545,20 +629,34 @@ const QuizNumerology = () => {
                           )}
                         </div>
                         <div className="flex min-h-0 flex-col">
-                          <a
-                            href={buildTelegramBotUrl("present", { giftTrack: focus ?? undefined })}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex min-h-11 w-full items-center justify-center border border-hairline bg-background/60 px-3 py-2.5 text-center text-[11px] font-medium uppercase leading-tight tracking-[0.1em] text-muted-foreground transition-colors hover:border-muted-foreground/30 hover:bg-background hover:text-foreground sm:min-h-[3rem] sm:text-xs"
+                          <button
+                            type="button"
+                            disabled={attributionGateBlocked}
+                            onClick={() => {
+                              window.open(
+                                buildTelegramBotUrl("present", {
+                                  giftTrack: focus ?? undefined,
+                                  contextToken: botCtxToken ?? undefined,
+                                }),
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            }}
+                            className="inline-flex min-h-11 w-full items-center justify-center border border-hairline bg-background/60 px-3 py-2.5 text-center text-[11px] font-medium uppercase leading-tight tracking-[0.1em] text-muted-foreground transition-colors hover:border-muted-foreground/30 hover:bg-background hover:text-foreground disabled:pointer-events-none disabled:opacity-45 sm:min-h-[3rem] sm:text-xs"
                           >
-                            Получить подарок
-                          </a>
+                            {attributionGateBlocked ? "Подождите…" : "Получить подарок"}
+                          </button>
                           <p className="mt-1.5 text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">@OSvetlanabot</p>
                           <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
                             После открытия бота обязательно нажми Start.
                           </p>
                         </div>
                       </div>
+                      {attributionGateBlocked ? (
+                        <p className="mt-3 text-center text-[11px] text-muted-foreground sm:text-xs">
+                          Готовим ссылку в бота с меткой перехода (реклама / источник)…
+                        </p>
+                      ) : null}
                     </div>
                   </article>
 
@@ -639,10 +737,10 @@ const QuizNumerology = () => {
 
                         <button
                           type="submit"
-                          disabled={sending}
+                          disabled={sending || attributionGateBlocked}
                           className="inline-flex items-center justify-center border border-accent px-5 py-2.5 text-xs uppercase tracking-[0.2em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50 sm:px-6 sm:py-3 sm:tracking-[0.22em]"
                         >
-                          {sending ? "Отправляем..." : "Отправить анкету"}
+                          {sending ? "Отправляем..." : attributionGateBlocked ? "Подождите…" : "Отправить анкету"}
                         </button>
                       </form>
                     </article>

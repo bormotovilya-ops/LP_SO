@@ -491,3 +491,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/crm-bot-event/deno.json"
 entrypoint = "./functions/crm-bot-event/index.ts"
+
+[functions.crm-bot-attribution-token]
+enabled = true
+verify_jwt = false
+import_map = "./functions/crm-bot-attribution-token/deno.json"
+entrypoint = "./functions/crm-bot-attribution-token/index.ts"
