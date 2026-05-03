@@ -67,6 +67,25 @@ function getMessageFrom(update: JsonObject): JsonObject | null {
   return from as JsonObject;
 }
 
+/**
+ * `from.id` — bigint в PostgreSQL; в апдейте чаще number, но возможна строка.
+ * Если требовать только `typeof id === 'number'`, CRM не вызывается и `telegram_id` остаётся пустым.
+ */
+function telegramUserIdString(fromObj: JsonObject | null): string | null {
+  if (!fromObj) return null;
+  const raw = fromObj.id;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const n = Math.trunc(raw);
+    if (!Number.isSafeInteger(n) || n <= 0) return null;
+    return String(n);
+  }
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (/^\d{1,20}$/.test(t)) return t;
+  }
+  return null;
+}
+
 function getChatId(update: JsonObject): number | null {
   const message = update.message;
   if (!message || typeof message !== "object") return null;
@@ -297,7 +316,7 @@ async function notifyChannel(
   giftTrack: GiftTrack | null,
   from: JsonObject | null,
 ): Promise<void> {
-  const userId = typeof from?.id === "number" ? String(from.id) : "unknown";
+  const userId = telegramUserIdString(from) ?? "unknown";
   const username = typeof from?.username === "string" ? `@${from.username}` : "—";
   const firstName = typeof from?.first_name === "string" ? from.first_name : "";
   const text = [
@@ -333,8 +352,8 @@ async function savePracticesCollectionTelegramCrm(
   const firstName = typeof from?.first_name === "string" ? from.first_name : "";
   const lastName = typeof from?.last_name === "string" ? from.last_name : "";
   const fullName = `${firstName} ${lastName}`.trim();
-  const telegramId = typeof from?.id === "number" ? from.id : null;
-  if (!telegramId) return;
+  const telegramIdStr = telegramUserIdString(from);
+  if (!telegramIdStr) return;
 
   const client = createClient(supabaseUrl, serviceRole, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -344,7 +363,7 @@ async function savePracticesCollectionTelegramCrm(
     p_full_name: fullName || null,
     p_phone: null,
     p_email: null,
-    p_telegram_id: telegramId,
+    p_telegram_id: telegramIdStr,
     p_source_channel: "bot",
     p_source_detail: "practices_collection_delivery",
     p_utm_source: null,
@@ -361,7 +380,7 @@ async function savePracticesCollectionTelegramCrm(
   const { data: contacts } = await client
     .from("crm_contacts")
     .select("id")
-    .eq("telegram_id", telegramId)
+    .eq("telegram_id", telegramIdStr)
     .limit(1);
   const contactId = contacts?.[0]?.id as string | undefined;
   if (!contactId) return;
@@ -529,9 +548,12 @@ async function saveCrmBotEvent(
   const firstName = typeof from?.first_name === "string" ? from.first_name : "";
   const lastName = typeof from?.last_name === "string" ? from.last_name : "";
   const fullName = `${firstName} ${lastName}`.trim();
-  const telegramId = typeof from?.id === "number" ? from.id : null;
+  const telegramIdStr = telegramUserIdString(from);
 
-  if (!telegramId) return;
+  if (!telegramIdStr) {
+    console.warn("[telegram-webhook] saveCrmBotEvent: отсутствует или некорректный from.id");
+    return;
+  }
 
   const client = createClient(supabaseUrl, serviceRole, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -545,7 +567,7 @@ async function saveCrmBotEvent(
   const { error: upsertError } = await client.rpc("crm_upsert_contact", {
     p_full_name: fullName || null,
     p_phone: attribution?.phone?.trim() || null,
-    p_telegram_id: telegramId,
+    p_telegram_id: telegramIdStr,
     p_source_channel: leadSourceChannel,
     p_source_detail: "telegram-webhook",
     p_segment: giftTrack ?? null,
@@ -569,7 +591,7 @@ async function saveCrmBotEvent(
   const { data: contacts } = await client
     .from("crm_contacts")
     .select("id")
-    .eq("telegram_id", telegramId)
+    .eq("telegram_id", telegramIdStr)
     .limit(1);
   const contactId = contacts?.[0]?.id as string | undefined;
   if (!contactId) return;
