@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { functionsApiUrl } from "@/lib/functionsApi";
+import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import { buildTelegramBotUrl } from "@/lib/botLinks";
 
 export const Contact = () => {
@@ -48,7 +48,10 @@ export const Contact = () => {
 
       const res = await fetch(functionsApiUrl("/contact"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
+        },
         body: JSON.stringify({
           name,
           contact,

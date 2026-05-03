@@ -10,7 +10,7 @@ import { QuizChatIntro } from "@/components/QuizChatIntro";
 import { Footer } from "@/components/landing/Footer";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { useToast } from "@/hooks/use-toast";
-import { functionsApiUrl } from "@/lib/functionsApi";
+import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import { buildTelegramBotUrl } from "@/lib/botLinks";
 import {
   captureQuizUtmsFromLocation,
@@ -343,7 +343,10 @@ const QuizNumerology = () => {
 
       const res = await fetch(functionsApiUrl("/contact"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
+        },
         body: JSON.stringify({
           name,
           contact: phone,
