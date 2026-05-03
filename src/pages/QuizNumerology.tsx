@@ -200,7 +200,6 @@ const QuizNumerology = () => {
   const [investReady, setInvestReady] = useState("");
   const [yearConsequence, setYearConsequence] = useState("");
   const [policyAccepted, setPolicyAccepted] = useState(false);
-  const [giftPolicyAccepted, setGiftPolicyAccepted] = useState(false);
   const [sending, setSending] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
@@ -265,7 +264,8 @@ const QuizNumerology = () => {
   }, []);
 
   const attributionGateBlocked = useMemo(() => hasAnyUtm(quizUtm) && !botCtxResolved, [quizUtm, botCtxResolved]);
-  const giftButtonBlocked = attributionGateBlocked || !giftPolicyAccepted;
+  /** Одно согласие с политикой/офертой для «Разбор» и «Подарок». */
+  const quizCtaBlocked = attributionGateBlocked || !policyAccepted;
 
   const focusLabel = useMemo(
     () => (focus ? focusOptions.find((f) => f.key === focus)?.label : null),
@@ -617,11 +617,30 @@ const QuizNumerology = () => {
                     )}
 
                     <div className="mt-6 rounded-lg border border-hairline/90 bg-surface/40 p-4 sm:mt-8 sm:p-5 md:p-6">
+                      <label className="mb-4 flex cursor-pointer items-start gap-3 text-left text-sm text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={policyAccepted}
+                          onChange={(e) => setPolicyAccepted(e.target.checked)}
+                          className="mt-1 h-4 w-4 shrink-0"
+                        />
+                        <span>
+                          Ознакомилась с{" "}
+                          <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">
+                            политикой конфиденциальности
+                          </Link>{" "}
+                          и{" "}
+                          <Link to="/oferta" className="text-accent underline-offset-2 hover:underline">
+                            договором оферты
+                          </Link>
+                          .
+                        </span>
+                      </label>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3">
                         <div className="flex min-h-0 flex-col">
                           <button
                             type="button"
-                            disabled={attributionGateBlocked}
+                            disabled={quizCtaBlocked}
                             onClick={openBookingForm}
                             className="inline-flex min-h-11 w-full items-center justify-center border border-accent bg-accent px-3 py-2.5 text-[11px] font-medium uppercase leading-tight tracking-[0.16em] text-accent-foreground shadow-sm transition-colors hover:bg-accent/90 disabled:pointer-events-none disabled:opacity-45 sm:min-h-[3rem] sm:text-xs sm:tracking-[0.18em]"
                           >
@@ -634,28 +653,9 @@ const QuizNumerology = () => {
                           )}
                         </div>
                         <div className="flex min-h-0 flex-col">
-                          <label className="mb-3 flex cursor-pointer items-start gap-3 text-left text-[11px] leading-snug text-muted-foreground sm:text-xs">
-                            <input
-                              type="checkbox"
-                              checked={giftPolicyAccepted}
-                              onChange={(e) => setGiftPolicyAccepted(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 shrink-0"
-                            />
-                            <span>
-                              Ознакомилась с{" "}
-                              <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">
-                                политикой конфиденциальности
-                              </Link>{" "}
-                              и{" "}
-                              <Link to="/oferta" className="text-accent underline-offset-2 hover:underline">
-                                договором оферты
-                              </Link>
-                              .
-                            </span>
-                          </label>
                           <button
                             type="button"
-                            disabled={giftButtonBlocked}
+                            disabled={quizCtaBlocked}
                             onClick={() => {
                               window.open(
                                 buildTelegramBotUrl("present", {
@@ -739,29 +739,9 @@ const QuizNumerology = () => {
                           onChange={setYearConsequence}
                         />
 
-                        <label className="flex items-start gap-3 text-sm text-muted-foreground">
-                          <input
-                            type="checkbox"
-                            checked={policyAccepted}
-                            onChange={(e) => setPolicyAccepted(e.target.checked)}
-                            className="mt-1 h-4 w-4"
-                          />
-                          <span>
-                            Ознакомилась с{" "}
-                            <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">
-                              политикой конфиденциальности
-                            </Link>{" "}
-                            и{" "}
-                            <Link to="/oferta" className="text-accent underline-offset-2 hover:underline">
-                              договором оферты
-                            </Link>
-                            .
-                          </span>
-                        </label>
-
                         <button
                           type="submit"
-                          disabled={sending || attributionGateBlocked}
+                          disabled={sending || quizCtaBlocked}
                           className="inline-flex items-center justify-center border border-accent px-5 py-2.5 text-xs uppercase tracking-[0.2em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50 sm:px-6 sm:py-3 sm:tracking-[0.22em]"
                         >
                           {sending ? "Отправляем..." : attributionGateBlocked ? "Подождите…" : "Отправить анкету"}
