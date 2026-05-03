@@ -19,10 +19,13 @@ export const Contact = () => {
     const goal = String(formData.get("goal") ?? "").trim();
     const message = String(formData.get("message") ?? "").trim();
 
-    /** Сразу по клику — иначе после await браузер часто режет вторую вкладку с ботом. */
+    /**
+     * Пустая вкладка по клику, потом подставляем URL бота (обход части блокировок всплывающих окон).
+     * Важно: без `noopener` — иначе у многих браузеров opener не может сделать `location` на t.me, вкладка залипает на about:blank.
+     */
     let botTab: Window | null = null;
     try {
-      botTab = window.open("about:blank", "_blank", "noopener,noreferrer");
+      botTab = window.open("about:blank", "_blank");
     } catch {
       botTab = null;
     }
@@ -110,14 +113,23 @@ export const Contact = () => {
       let botOpened = false;
       if (botTab && !botTab.closed) {
         try {
-          botTab.location.replace(botUrl);
+          botTab.location.href = botUrl;
           botOpened = true;
         } catch {
-          botTab.close();
+          try {
+            botTab.location.replace(botUrl);
+            botOpened = true;
+          } catch {
+            try {
+              botTab.close();
+            } catch {
+              /* ignore */
+            }
+          }
         }
       }
       if (!botOpened) {
-        const w = window.open(botUrl, "_blank", "noopener,noreferrer");
+        const w = window.open(botUrl, "_blank");
         botOpened = Boolean(w);
       }
       if (!botOpened) {
