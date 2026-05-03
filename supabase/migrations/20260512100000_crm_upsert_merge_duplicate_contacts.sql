@@ -1,5 +1,6 @@
 -- Сливает несколько crm_contacts, если они совпали по телефону, email или Telegram ID (разбор после подарка и т.п.).
--- Сохраняет самую старую запись как основную и перекидывает ссылки задач / ленты / истории этапов / заказов / сессий бота.
+-- Эталон идентичности — учётка Telegram (/start): при наличии p_telegram_id основной контакт = строка с этим telegram_id (не «самая старая»).
+-- Данные из заявки на сайте могут быть произвольными; при апсерте с p_telegram_id не затираем уже заполненные ФИО/тел/email.
 
 DROP FUNCTION IF EXISTS public.crm_upsert_contact(
   text,
@@ -78,20 +79,53 @@ BEGIN
   END IF;
 
   IF v_nc > 1 THEN
+    v_keep_id := NULL;
+    IF p_telegram_id IS NOT NULL THEN
+      SELECT c.id
+        INTO v_keep_id
+        FROM public.crm_contacts c
+       WHERE c.id = ANY (v_candidate_ids)
+         AND c.telegram_id = p_telegram_id
+       ORDER BY c.created_at ASC, c.id ASC
+       LIMIT 1;
+    END IF;
+    IF v_keep_id IS NULL
+       AND p_resolve_contact_id IS NOT NULL
+       AND p_resolve_contact_id = ANY (v_candidate_ids)
+    THEN
+      v_keep_id := p_resolve_contact_id;
+    END IF;
+    IF v_keep_id IS NULL THEN
+      v_keep_id := v_candidate_ids[1];
+    END IF;
+
     FOR r IN
       SELECT *
         FROM public.crm_contacts c
        WHERE c.id = ANY(v_candidate_ids)
        ORDER BY c.created_at ASC, c.id ASC
     LOOP
-      IF v_keep_id IS NULL THEN
-        v_keep_id := r.id;
-      ELSE
+      IF r.id = v_keep_id THEN
+        CONTINUE;
+      END IF;
         UPDATE public.crm_contacts k
-           SET full_name =
-                 COALESCE(nullif(trim(k.full_name), ''), nullif(trim(r.full_name), '')),
-               phone = coalesce(k.phone, r.phone),
-               email = COALESCE(nullif(lower(trim(coalesce(k.email, ''))), ''), nullif(lower(trim(coalesce(r.email, ''))), '')),
+           SET full_name = CASE
+                 WHEN k.telegram_id IS NOT NULL AND r.telegram_id IS NULL
+                   THEN nullif(trim(k.full_name), '')
+                 ELSE COALESCE(nullif(trim(k.full_name), ''), nullif(trim(r.full_name), ''))
+               END,
+               phone = CASE
+                 WHEN k.telegram_id IS NOT NULL AND r.telegram_id IS NULL THEN k.phone
+                 ELSE coalesce(k.phone, r.phone)
+               END,
+               email = CASE
+                 WHEN k.telegram_id IS NOT NULL AND r.telegram_id IS NULL THEN
+                   nullif(lower(trim(coalesce(k.email, ''))), '')
+                 ELSE COALESCE(
+                   nullif(lower(trim(coalesce(k.email, ''))), ''),
+                   nullif(lower(trim(coalesce(r.email, ''))), '')
+                 )
+               END,
                telegram_id = coalesce(k.telegram_id, r.telegram_id),
                whatsapp_id = COALESCE(nullif(trim(k.whatsapp_id), ''), nullif(trim(r.whatsapp_id), '')),
                vk_id = COALESCE(nullif(trim(k.vk_id), ''), nullif(trim(r.vk_id), '')),
@@ -164,7 +198,6 @@ BEGIN
          WHERE a.contact_id = r.id;
 
         DELETE FROM public.crm_contacts c WHERE c.id = r.id;
-      END IF;
     END LOOP;
 
     SELECT * INTO STRICT v_contact FROM public.crm_contacts c WHERE c.id = v_keep_id LIMIT 1;
@@ -245,9 +278,21 @@ BEGIN
   END IF;
 
   UPDATE public.crm_contacts c
-     SET full_name = coalesce(nullif(trim(p_full_name), ''), c.full_name),
-         phone = coalesce(v_phone, c.phone),
-         email = COALESCE(nullif(v_email, ''), c.email),
+     SET full_name = CASE
+           WHEN p_telegram_id IS NOT NULL THEN COALESCE(nullif(trim(c.full_name), ''), nullif(trim(p_full_name), ''))
+           ELSE coalesce(nullif(trim(p_full_name), ''), c.full_name)
+         END,
+         phone = CASE
+           WHEN p_telegram_id IS NOT NULL THEN coalesce(c.phone, v_phone)
+           ELSE coalesce(v_phone, c.phone)
+         END,
+         email = CASE
+           WHEN p_telegram_id IS NOT NULL THEN COALESCE(
+             nullif(lower(trim(coalesce(c.email, ''))), ''),
+             nullif(v_email, '')
+           )
+           ELSE COALESCE(nullif(v_email, ''), c.email)
+         END,
          telegram_id = coalesce(p_telegram_id, c.telegram_id),
          source_channel = coalesce(nullif(trim(p_source_channel), ''), c.source_channel),
          source_detail = coalesce(nullif(trim(p_source_detail), ''), c.source_detail),
@@ -269,7 +314,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.crm_upsert_contact(text, text, text, bigint, text, text, text, text, text, text, text, text, uuid, boolean, text, uuid) IS
-  'Upsert лида по телефону / email / Telegram / resolve id; несколько совпадений объединяет в один контакт без дубликатов.';
+  'Upsert лида по телефону / email / Telegram / resolve id; несколько совпадений сливает в один контакт. Якорь — строка с telegram_id при вызове с бота; сайтовые имя/тел/email не перетирают уже заполненные поля.';
 
 REVOKE ALL ON FUNCTION public.crm_upsert_contact(
   text, text, text, bigint, text, text, text, text, text, text, text, text, uuid, boolean, text, uuid
