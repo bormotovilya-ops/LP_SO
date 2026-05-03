@@ -322,6 +322,33 @@ const QuizNumerology = () => {
       if (!crmRes.ok) throw new Error("crm-upsert-failed");
       const crmContactId = crmPayload.contact?.id;
 
+      if (botCtxToken) {
+        await Promise.all([
+          crmContactId
+            ? fetch(functionsApiUrl("/crm-bot-attribution-token"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "attach_contact",
+                  token: botCtxToken,
+                  contactId: crmContactId,
+                }),
+              }).catch(() => undefined)
+            : Promise.resolve(),
+          phone.trim()
+            ? fetch(functionsApiUrl("/crm-bot-attribution-token"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "attach_phone",
+                  token: botCtxToken,
+                  phone: phone.trim(),
+                }),
+              }).catch(() => undefined)
+            : Promise.resolve(),
+        ]);
+      }
+
       const message = [
         "Анкета после квиза",
         `Тема подарка: ${focus ?? "—"}`,
@@ -374,17 +401,6 @@ const QuizNumerology = () => {
           title: "Откроем Telegram-бота",
           description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
         });
-        if (botCtxToken && phone.trim()) {
-          await fetch(functionsApiUrl("/crm-bot-attribution-token"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "attach_phone",
-              token: botCtxToken,
-              phone: phone.trim(),
-            }),
-          }).catch(() => undefined);
-        }
         window.open(
           buildTelegramBotUrl("razbor", { contextToken: botCtxToken ?? undefined }),
           "_blank",

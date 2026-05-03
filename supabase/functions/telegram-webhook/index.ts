@@ -515,6 +515,7 @@ type BotAttributionRow = {
   utm_content: string | null;
   utm_term: string | null;
   phone: string | null;
+  contact_id: string | null;
 };
 
 async function fetchBotAttributionRow(
@@ -525,7 +526,7 @@ async function fetchBotAttributionRow(
   const t = token.toLowerCase();
   const { data, error } = await client
     .from("crm_bot_start_attribution")
-    .select("utm_source, utm_medium, utm_campaign, utm_content, utm_term, phone")
+    .select("utm_source, utm_medium, utm_campaign, utm_content, utm_term, phone, contact_id")
     .eq("token", t)
     .maybeSingle();
   if (error || !data) return null;
@@ -564,6 +565,8 @@ async function saveCrmBotEvent(
   /** С квиза приходит `_ctx_` с UTM: канал лида = utm_source, а не общий «bot». */
   const leadSourceChannel = (attribution?.utm_source?.trim() ?? "") || "bot";
 
+  const resolveContactId = attribution?.contact_id?.trim?.() ?? null;
+
   const { error: upsertError } = await client.rpc("crm_upsert_contact", {
     p_full_name: fullName || null,
     p_phone: attribution?.phone?.trim() || null,
@@ -577,6 +580,9 @@ async function saveCrmBotEvent(
     p_utm_campaign: attribution?.utm_campaign ?? null,
     p_utm_content: attribution?.utm_content ?? null,
     p_utm_term: attribution?.utm_term ?? null,
+    p_resolve_contact_id: resolveContactId && /^[0-9a-f-]{36}$/i.test(resolveContactId)
+      ? resolveContactId.toLowerCase()
+      : null,
   });
 
   if (upsertError) {

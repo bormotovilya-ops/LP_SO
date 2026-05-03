@@ -11,6 +11,8 @@ type Body = {
   action?: string;
   token?: string;
   phone?: string;
+  /** UUID контакта из crm-lead-upsert после квиза — для точного слияния при /start. */
+  contactId?: string;
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
@@ -40,6 +42,13 @@ function randomHexToken(): string {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function looksLikeUuid(raw: unknown): raw is string {
+  return typeof raw === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      raw.trim(),
+    );
 }
 
 Deno.serve(async (req) => {
@@ -76,6 +85,30 @@ Deno.serve(async (req) => {
       .select("token");
     if (error) {
       return json({ error: "Failed to attach phone", details: error.message }, 500);
+    }
+    if (!data?.length) {
+      return json({ error: "Token not found" }, 404);
+    }
+    return json({ ok: true }, 200);
+  }
+
+  if (toNullableString(body.action) === "attach_contact") {
+    const token = toNullableString(body.token);
+    const cid = looksLikeUuid(body.contactId) ? body.contactId.trim().toLowerCase() : "";
+    if (!token || !/^[a-f0-9]{12}$/i.test(token) || !cid) {
+      return json({ error: "token (12 hex) and valid contactId (uuid) are required" }, 400);
+    }
+    const client = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const t = token.toLowerCase();
+    const { data, error } = await client
+      .from("crm_bot_start_attribution")
+      .update({ contact_id: cid })
+      .eq("token", t)
+      .select("token");
+    if (error) {
+      return json({ error: "Failed to attach contact", details: error.message }, 500);
     }
     if (!data?.length) {
       return json({ error: "Token not found" }, 404);
