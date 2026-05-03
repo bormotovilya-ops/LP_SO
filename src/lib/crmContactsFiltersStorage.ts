@@ -11,6 +11,8 @@ export type CrmContactsOwnerFilter = "any" | "mine" | "unassigned";
 export type CrmContactsSortKey = "activity" | "next_action" | "created";
 /** Быстрый фильтр по полю «следующее действие». */
 export type CrmContactsNextActionPreset = "any" | "scheduled" | "overdue" | "today";
+/** Фильтр по флагу «подарок получен» на контакте. */
+export type CrmContactsGiftFilter = "any" | "yes" | "no";
 
 const LEGAL_PAGE_SIZES = [10, 25, 50, 100] as const;
 export type CrmContactsPageSize = (typeof LEGAL_PAGE_SIZES)[number];
@@ -29,6 +31,7 @@ export type CrmContactsFiltersPersist = {
   requirePhone: boolean;
   requireEmail: boolean;
   consentYesOnly: boolean;
+  giftReceivedFilter: CrmContactsGiftFilter;
   ownerFilter: CrmContactsOwnerFilter;
   sortKey: CrmContactsSortKey;
   nextActionPreset: CrmContactsNextActionPreset;
@@ -93,6 +96,8 @@ export function summarizeCrmFilters(s: Omit<CrmContactsFiltersPersist, "v">): st
   if (s.requirePhone) parts.push("есть тел.");
   if (s.requireEmail) parts.push("есть email");
   if (s.consentYesOnly) parts.push("ПДн");
+  if (s.giftReceivedFilter === "yes") parts.push("подарок: да");
+  if (s.giftReceivedFilter === "no") parts.push("подарок: нет");
   if (s.ownerFilter === "mine") parts.push("мои");
   if (s.ownerFilter === "unassigned") parts.push("без ответств.");
   if (s.nextActionPreset === "scheduled") parts.push("есть дата шага");

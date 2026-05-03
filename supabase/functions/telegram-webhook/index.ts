@@ -641,6 +641,16 @@ async function saveCrmBotEvent(
       p_note: stageNote,
     });
   }
+
+  if (intent === "present") {
+    const { error: giftFlagErr } = await client
+      .from("crm_contacts")
+      .update({ gift_received: true })
+      .eq("id", contactId);
+    if (giftFlagErr) {
+      console.warn("[telegram-webhook] gift_received flag update failed:", giftFlagErr.message);
+    }
+  }
 }
 
 Deno.serve(async (req) => {

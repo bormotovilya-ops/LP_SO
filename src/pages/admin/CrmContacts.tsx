@@ -25,6 +25,7 @@ import {
   type CrmContactsOwnerFilter,
   type CrmContactsPageSize,
   type CrmContactsSortKey,
+  type CrmContactsGiftFilter,
   type DuplicateFilter,
   type QuickSourcePreset,
   coercePageSize,
@@ -98,6 +99,11 @@ function readStoredState() {
     ownerFilter = s.ownerFilter;
   }
 
+  let giftReceivedFilter: CrmContactsGiftFilter = "any";
+  if (s?.giftReceivedFilter === "yes" || s?.giftReceivedFilter === "no") {
+    giftReceivedFilter = s.giftReceivedFilter;
+  }
+
   let sortKey: CrmContactsSortKey = "activity";
   if (s?.sortKey === "next_action" || s?.sortKey === "created" || s?.sortKey === "activity") {
     sortKey = s.sortKey;
@@ -126,6 +132,7 @@ function readStoredState() {
     requirePhone: Boolean(s?.requirePhone),
     requireEmail: Boolean(s?.requireEmail),
     consentYesOnly: Boolean(s?.consentYesOnly),
+    giftReceivedFilter,
     ownerFilter,
     sortKey,
     nextActionPreset,
@@ -158,6 +165,7 @@ export default function CrmContacts() {
   const [requirePhone, setRequirePhone] = useState(z.requirePhone);
   const [requireEmail, setRequireEmail] = useState(z.requireEmail);
   const [consentYesOnly, setConsentYesOnly] = useState(z.consentYesOnly);
+  const [giftReceivedFilter, setGiftReceivedFilter] = useState<CrmContactsGiftFilter>(z.giftReceivedFilter);
   const [ownerFilter, setOwnerFilter] = useState<CrmContactsOwnerFilter>(z.ownerFilter);
   const [sortKey, setSortKey] = useState<CrmContactsSortKey>(z.sortKey);
   const [nextActionPreset, setNextActionPreset] = useState<CrmContactsNextActionPreset>(z.nextActionPreset);
@@ -184,6 +192,7 @@ export default function CrmContacts() {
     requirePhone,
     requireEmail,
     consentYesOnly,
+    giftReceivedFilter,
     ownerFilter,
     nextActionPreset,
   ]);
@@ -203,6 +212,7 @@ export default function CrmContacts() {
       requirePhone,
       requireEmail,
       consentYesOnly,
+      giftReceivedFilter,
       ownerFilter,
       sortKey,
       nextActionPreset,
@@ -211,6 +221,7 @@ export default function CrmContacts() {
     });
   }, [
     consentYesOnly,
+    giftReceivedFilter,
     duplicateFilter,
     exactChannel,
     filtersPanelOpen,
@@ -290,6 +301,7 @@ export default function CrmContacts() {
       p_require_phone: requirePhone,
       p_require_email: requireEmail,
       p_consent_only: consentYesOnly,
+      p_gift_received_filter: giftReceivedFilter,
       p_owner_filter: ownerFilter,
       p_my_user_id: myUserId,
       p_next_action_preset: nextActionPreset,
@@ -298,6 +310,7 @@ export default function CrmContacts() {
     }),
     [
       consentYesOnly,
+      giftReceivedFilter,
       duplicateFilter,
       exactChannel,
       myUserId,
@@ -399,6 +412,7 @@ export default function CrmContacts() {
     requirePhone,
     requireEmail,
     consentYesOnly,
+    giftReceivedFilter,
     ownerFilter,
     sortKey,
     nextActionPreset,
@@ -420,6 +434,7 @@ export default function CrmContacts() {
     setRequirePhone(false);
     setRequireEmail(false);
     setConsentYesOnly(false);
+    setGiftReceivedFilter("any");
     setOwnerFilter("any");
     setNextActionPreset("any");
     setPage(1);
@@ -450,7 +465,8 @@ export default function CrmContacts() {
     requireTelegramId ||
     requirePhone ||
     requireEmail ||
-    consentYesOnly;
+    consentYesOnly ||
+    giftReceivedFilter !== "any";
 
   return (
     <div className="space-y-6">
@@ -622,6 +638,23 @@ export default function CrmContacts() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Подарок из бота</Label>
+                  <Select
+                    value={giftReceivedFilter}
+                    onValueChange={(v) => setGiftReceivedFilter(v as CrmContactsGiftFilter)}
+                  >
+                    <SelectTrigger className="border-hairline">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Все контакты</SelectItem>
+                      <SelectItem value="yes">Подарок получен</SelectItem>
+                      <SelectItem value="no">Подарка ещё не было</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Ответственный</Label>
                   <Select
                     value={ownerFilter}
@@ -788,6 +821,7 @@ export default function CrmContacts() {
                 <TableHead className="text-xs uppercase tracking-wider">Телефон</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Email</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Источник</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider">Подарок</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Этап</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Ответств.</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">След. шаг</TableHead>
@@ -813,6 +847,13 @@ export default function CrmContacts() {
                       <span className="ml-1 text-xs text-muted-foreground">· {c.source_detail}</span>
                     ) : null}
                   </TableCell>
+                  <TableCell className="text-sm tabular-nums text-muted-foreground">
+                    {c.gift_received === true ? (
+                      <span className="text-foreground">Да</span>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   <TableCell className="text-sm">
                     {c.current_stage_id ? (stageNameById.get(c.current_stage_id) ?? "—") : "—"}
                   </TableCell>
@@ -835,7 +876,7 @@ export default function CrmContacts() {
               ))}
               {totalFiltered === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
                     Нет контактов по выбранным фильтрам
                   </TableCell>
                 </TableRow>

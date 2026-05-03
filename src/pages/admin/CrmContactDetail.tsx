@@ -35,6 +35,7 @@ import {
   normalizeCrmLeadSourceCode,
   sourceChannelAdminSelectValue,
 } from "@/lib/crmLeadSources";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -256,6 +257,7 @@ export default function CrmContactDetail() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [giftReceived, setGiftReceived] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stageChangeNote, setStageChangeNote] = useState("");
   const [timelineNote, setTimelineNote] = useState("");
@@ -306,6 +308,7 @@ export default function CrmContactDetail() {
     setFullName(contact.full_name ?? "");
     setPhone(contact.phone ?? "");
     setEmail(contact.email ?? "");
+    setGiftReceived(Boolean(contact.gift_received));
     setAdminSourceDetail(contact.source_detail ?? "");
     setAdminUtmSource(contact.utm_source ?? "");
     setAdminUtmMedium(contact.utm_medium ?? "");
@@ -358,6 +361,7 @@ export default function CrmContactDetail() {
         full_name: fullName || null,
         phone: phone || null,
         email: email || null,
+        gift_received: giftReceived,
       };
 
       const adminPayload = isCrmAdmin
@@ -538,15 +542,19 @@ export default function CrmContactDetail() {
           Источник: {crmLeadSourceLabel(contact.source_channel)}
           {contact.telegram_id ? ` · Telegram ID: ${contact.telegram_id}` : ""}
         </p>
-        {latestGiftReceivedSummary ? (
+        {contact.gift_received === true ? (
           <div className="mt-3 rounded-sm border border-accent/35 bg-accent/5 px-3 py-2 text-sm text-foreground">
-            <p className="font-medium text-accent">Подарок из бота получен</p>
-            {latestGiftReceivedSummary.line ? (
+            <p className="font-medium text-accent">Подарок получен</p>
+            {latestGiftReceivedSummary?.line ? (
               <p className="mt-0.5 leading-snug text-foreground/90">{latestGiftReceivedSummary.line}</p>
+            ) : (
+              <p className="mt-0.5 text-xs text-muted-foreground">Флаг установлен автоматически при выдаче в боте или вручную в CRM.</p>
+            )}
+            {latestGiftReceivedSummary ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Событие в ленте: {format(parseISO(latestGiftReceivedSummary.at), "d MMMM yyyy, HH:mm", { locale: ru })}
+              </p>
             ) : null}
-            <p className="mt-1 text-xs text-muted-foreground">
-              {format(parseISO(latestGiftReceivedSummary.at), "d MMMM yyyy, HH:mm", { locale: ru })}
-            </p>
           </div>
         ) : null}
       </div>
@@ -602,6 +610,20 @@ export default function CrmContactDetail() {
               />
             </div>
           </div>
+          <label
+            className={cn(
+              "flex cursor-pointer items-center gap-2 rounded-sm border border-hairline bg-surface/20 px-3 py-2.5 text-sm sm:col-span-2",
+              readOnly && "cursor-default opacity-80",
+            )}
+          >
+            <Checkbox
+              checked={giftReceived}
+              onCheckedChange={(c) => setGiftReceived(c === true)}
+              disabled={readOnly}
+            />
+            <span>Подарок получен (медитация из Telegram-бота)</span>
+          </label>
+
           <div className="space-y-2">
             <Label>Email</Label>
             <Input

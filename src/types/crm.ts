@@ -28,6 +28,8 @@ export type CrmContactRow = {
   lead_temperature?: LeadTemperature;
   is_duplicate?: boolean;
   consent_personal_data?: boolean;
+  /** Медитация-подарок выдана в Telegram (бот, сценарий present). */
+  gift_received?: boolean;
   current_stage_id: string | null;
   owner_user_id: string | null;
   last_activity_at: string | null;
