@@ -19,6 +19,14 @@ export const Contact = () => {
     const goal = String(formData.get("goal") ?? "").trim();
     const message = String(formData.get("message") ?? "").trim();
 
+    /** Сразу по клику — иначе после await браузер часто режет вторую вкладку с ботом. */
+    let botTab: Window | null = null;
+    try {
+      botTab = window.open("about:blank", "_blank", "noopener,noreferrer");
+    } catch {
+      botTab = null;
+    }
+
     try {
       const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
         method: "POST",
@@ -43,6 +51,7 @@ export const Contact = () => {
         }),
       });
       if (!crmRes.ok) {
+        botTab?.close();
         throw new Error(`CRM upsert failed: ${crmRes.status}`);
       }
 
@@ -97,52 +106,83 @@ export const Contact = () => {
         /* если токен не выдался — открываем бота как раньше (fallback) */
       }
 
-      const res = await fetch(functionsApiUrl("/contact"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
-        },
-        body: JSON.stringify({
-          name,
-          contact,
-          messenger,
-          goal,
-          message,
-          crmEventType: "diagnostic_request_submitted",
-          ...(crmContactId ? { crmContactId } : {}),
-        }),
-      });
+      const botUrl = buildTelegramBotUrl("diagnostic", { contextToken: diagnosticBotCtx });
 
-      let data: { ok?: boolean } = {};
+      let telegramChannelDelivered = false;
       try {
-        data = (await res.json()) as { ok?: boolean };
+        const res = await fetch(functionsApiUrl("/contact"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
+          },
+          body: JSON.stringify({
+            name,
+            contact,
+            messenger,
+            goal,
+            message,
+            crmEventType: "diagnostic_request_submitted",
+            ...(crmContactId ? { crmContactId } : {}),
+          }),
+        });
+        let body: unknown = {};
+        try {
+          body = await res.json();
+        } catch {
+          body = {};
+        }
+        telegramChannelDelivered =
+          res.ok &&
+          typeof body === "object" &&
+          body !== null &&
+          (body as { ok?: unknown }).ok === true;
       } catch {
-        throw new Error("bad response");
+        telegramChannelDelivered = false;
       }
 
-      if (!res.ok || data.ok !== true) {
+      let botOpened = false;
+      if (botTab && !botTab.closed) {
+        try {
+          botTab.location.replace(botUrl);
+          botOpened = true;
+        } catch {
+          botTab.close();
+        }
+      }
+      if (!botOpened) {
+        const w = window.open(botUrl, "_blank", "noopener,noreferrer");
+        botOpened = Boolean(w);
+      }
+      if (!botOpened) {
         toast({
-          title: "Лид сохранен в CRM",
-          description: "Заявка в Telegram временно не отправлена. Проверьте канал вручную.",
+          title: "Откройте бота вручную",
+          description: `${botUrl} — скопируйте ссылку или найдите бота по имени в Telegram.`,
         });
-      } else {
+      }
+
+      if (telegramChannelDelivered) {
         toast({
           title: "Заявка отправлена",
           description: "Мы свяжемся с вами по указанным контактам.",
         });
         toast({
           title: "Откроем Telegram-бота",
-          description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
+          description: botOpened
+            ? "Отдельная вкладка с ботом уже открыта — после перехода сценарий начнётся автоматически."
+            : "Используйте ссылку из предыдущего сообщения или откройте бота вручную.",
         });
-        window.open(
-          buildTelegramBotUrl("diagnostic", { contextToken: diagnosticBotCtx }),
-          "_blank",
-          "noopener,noreferrer",
-        );
+      } else {
+        toast({
+          title: "Заявка сохранена в CRM",
+          description: botOpened
+            ? "Сообщение в рабочий Telegram временно не доставлено. В другой вкладке уже открыт бот — там продолжите сценарий."
+            : "Сообщение в рабочий Telegram временно не доставлено (канал или токен бота). Если вкладку с ботом не удалось открыть — см. предыдущее уведомление со ссылкой.",
+        });
       }
       form.reset();
     } catch {
+      botTab?.close();
       toast({
         title: "Не удалось отправить",
         description: "Попробуйте позже или напишите в Telegram.",
