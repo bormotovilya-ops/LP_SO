@@ -62,6 +62,8 @@ type CrmStageHistoryRow = {
 const CRM_HISTORY_FETCH_LIMIT = 5000;
 
 function interactionBodyFromPayload(payload: Record<string, unknown>): string | null {
+  const summary = typeof payload.summary === "string" ? payload.summary.trim() : "";
+  if (summary) return summary;
   const raw =
     (typeof payload.body === "string" && payload.body) ||
     (typeof payload.note === "string" && payload.note) ||
@@ -70,6 +72,22 @@ function interactionBodyFromPayload(payload: Record<string, unknown>): string | 
     "";
   const t = raw.trim();
   return t ? t : null;
+}
+
+/** Подпись типа события в ленте (остальные — как в БД, через подчёркивания). */
+function crmInteractionTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    gift_received: "Подарок получен в боте",
+    bot_start: "Старт сценария в Telegram",
+    manual_note: "Заметка",
+    lead_capture: "Лид с сайта",
+    quiz_review_requested: "Анкета после квиза",
+    quiz_completed: "Заявка после квиза (сайт)",
+    diagnostic_request_submitted: "Заявка с формы",
+    outbound_practices_collection_file: "Выдача сборника практик",
+    practices_collection_paid: "Оплата сборника практик",
+  };
+  return map[type] ?? type.replaceAll("_", " ");
 }
 
 function toInputDatetimeLocal(iso: string | null): string {
@@ -217,6 +235,16 @@ export default function CrmContactDetail() {
     if (!contact?.current_stage_id) return null;
     return stageNameById.get(contact.current_stage_id) ?? null;
   }, [contact?.current_stage_id, stageNameById]);
+
+  /** Свежая запись о выдаче подарка (интеракции новее сверху). */
+  const latestGiftReceivedSummary = useMemo(() => {
+    const row = interactions.find((i) => i.interaction_type === "gift_received");
+    if (!row) return null;
+    return {
+      at: row.created_at,
+      line: interactionBodyFromPayload(row.payload),
+    };
+  }, [interactions]);
 
   /** Radix Select не допускает value="" и требует совпадения с SelectItem. */
   const stageCodes = useMemo(() => new Set((stages ?? []).map((s) => s.code)), [stages]);
@@ -510,6 +538,17 @@ export default function CrmContactDetail() {
           Источник: {crmLeadSourceLabel(contact.source_channel)}
           {contact.telegram_id ? ` · Telegram ID: ${contact.telegram_id}` : ""}
         </p>
+        {latestGiftReceivedSummary ? (
+          <div className="mt-3 rounded-sm border border-accent/35 bg-accent/5 px-3 py-2 text-sm text-foreground">
+            <p className="font-medium text-accent">Подарок из бота получен</p>
+            {latestGiftReceivedSummary.line ? (
+              <p className="mt-0.5 leading-snug text-foreground/90">{latestGiftReceivedSummary.line}</p>
+            ) : null}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {format(parseISO(latestGiftReceivedSummary.at), "d MMMM yyyy, HH:mm", { locale: ru })}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       {readOnly ? (
@@ -1055,7 +1094,7 @@ export default function CrmContactDetail() {
                   return (
                     <div key={item.id} className="rounded-sm border border-hairline bg-surface/20 px-3 py-2">
                       <p className="text-sm text-foreground">
-                        {item.interaction_type}
+                        {crmInteractionTypeLabel(item.interaction_type)}
                         <span className="text-muted-foreground">
                           {" "}
                           · {item.channel} · {item.direction}

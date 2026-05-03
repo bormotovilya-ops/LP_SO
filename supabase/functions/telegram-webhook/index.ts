@@ -602,29 +602,43 @@ async function saveCrmBotEvent(
   const contactId = contacts?.[0]?.id as string | undefined;
   if (!contactId) return;
 
+  const giftContent = intent === "present" ? buildGiftContent(giftTrack ?? null) : null;
+
   await client.rpc("crm_add_interaction", {
     p_contact_id: contactId,
     p_channel: "telegram",
     p_direction: "inbound",
-    p_interaction_type: "bot_start",
-    p_payload: {
-      text,
-      intent: intent ?? "unknown",
-      giftTrack: giftTrack ?? "default",
-      attribution: attribution,
-      update,
-    },
+    p_interaction_type: intent === "present" ? "gift_received" : "bot_start",
+    p_payload:
+      intent === "present" && giftContent
+        ? {
+            summary: `Подарок выдан в боте — «${giftContent.title}»`,
+            intent: "present",
+            gift_track: giftTrack ?? null,
+            gift_title: giftContent.title,
+          }
+        : {
+            text,
+            intent: intent ?? "unknown",
+            giftTrack: giftTrack ?? "default",
+            attribution: attribution,
+            update,
+          },
   });
 
   if (intent === "diagnostic" || intent === "razbor" || intent === "present") {
     const targetStageCode =
-      intent === "present" ? "new_lead" : "interest_confirmed";
+      intent === "present" ? "gift_received" : "interest_confirmed";
+    const stageNote =
+      intent === "present"
+        ? "Подарок из квиза получен в Telegram-боте (медитация отправлена)"
+        : "Пользователь запустил сценарий в Telegram-боте";
     await client.rpc("crm_change_stage", {
       p_contact_id: contactId,
       p_to_stage_code: targetStageCode,
       p_changed_by: "bot",
-      p_reason: "start_command",
-      p_note: "Пользователь запустил сценарий в Telegram-боте",
+      p_reason: intent === "present" ? "gift_delivered_bot" : "start_command",
+      p_note: stageNote,
     });
   }
 }
