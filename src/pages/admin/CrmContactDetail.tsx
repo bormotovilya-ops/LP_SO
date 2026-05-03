@@ -29,7 +29,12 @@ import {
   CRM_FUNNEL_SELECT_UNRESOLVED_SENTINEL,
   resolveCrmFunnelSelectValue,
 } from "@/lib/crmFunnelSelect";
-import { CRM_LEAD_SOURCES, crmLeadSourceLabel, normalizeCrmLeadSourceCode } from "@/lib/crmLeadSources";
+import {
+  adminLeadSourceSelectOptions,
+  crmLeadSourceLabel,
+  normalizeCrmLeadSourceCode,
+  sourceChannelAdminSelectValue,
+} from "@/lib/crmLeadSources";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -253,6 +258,11 @@ export default function CrmContactDetail() {
     [stageCode, stageCodes],
   );
 
+  const leadSourceSelectOptions = useMemo(
+    () => adminLeadSourceSelectOptions(contact?.source_channel),
+    [contact?.source_channel],
+  );
+
   useEffect(() => {
     if (user?.id) {
       setTaskAssigneeId((prev) => (prev === null ? user.id : prev));
@@ -275,7 +285,7 @@ export default function CrmContactDetail() {
     setAdminUtmContent(contact.utm_content ?? "");
     setAdminUtmTerm(contact.utm_term ?? "");
     setAdminSegment(contact.segment ?? "");
-    setAdminSourceChannel(normalizeCrmLeadSourceCode(contact.source_channel));
+    setAdminSourceChannel(sourceChannelAdminSelectValue(contact.source_channel));
     setAdminLeadTemperature((contact.lead_temperature as LeadTemperature) ?? "cold");
     setAdminTelegramId(contact.telegram_id != null ? String(contact.telegram_id) : "");
     setAdminIsDuplicate(contact.is_duplicate ?? false);
@@ -671,8 +681,8 @@ export default function CrmContactDetail() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CRM_LEAD_SOURCES.map(({ code, label }) => (
-                        <SelectItem key={code} value={code}>
+                      {leadSourceSelectOptions.map(({ value, label }) => (
+                        <SelectItem key={value} value={value}>
                           {label}
                         </SelectItem>
                       ))}

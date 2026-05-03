@@ -47,7 +47,39 @@ export function normalizeCrmLeadSourceCode(raw: string | null | undefined): CrmL
   return "other";
 }
 
+/** Значение для Select источника: канонический код или сырое (например utm_source=telegram → «telegram» в БД). */
+export function sourceChannelAdminSelectValue(raw: string | null | undefined): string {
+  const t = (raw ?? "").trim();
+  if (!t) return "other";
+  const low = t.toLowerCase();
+  if (LEGACY_TO_CANONICAL[low]) return LEGACY_TO_CANONICAL[low]!;
+  if (isCanon(low)) return low;
+  return t;
+}
+
+/** Опции селекта источника: 7 кодов + текущее произвольное значение из БД при необходимости. */
+export function adminLeadSourceSelectOptions(storedRaw: string | null | undefined) {
+  const base = CRM_LEAD_SOURCES.map(({ code, label }) => ({ value: code, label }));
+  const raw = (storedRaw ?? "").trim();
+  if (!raw) return base;
+  const low = raw.toLowerCase();
+  if (LEGACY_TO_CANONICAL[low] || isCanon(low)) return base;
+  const exists = base.some((b) => b.value.toLowerCase() === low);
+  if (exists) return base;
+  return [{ value: raw, label: crmLeadSourceLabel(raw) }, ...base];
+}
+
+function titleCaseSource(raw: string): string {
+  if (!raw.trim()) return raw;
+  return raw.slice(0, 1).toUpperCase() + raw.slice(1).toLowerCase();
+}
+
 /** Подпись для таблиц, карточки и дашборда. */
 export function crmLeadSourceLabel(raw: string | null | undefined): string {
-  return LABEL_BY_CODE[normalizeCrmLeadSourceCode(raw)];
+  const t = (raw ?? "").trim();
+  if (!t) return LABEL_BY_CODE.other;
+  const low = t.toLowerCase();
+  if (LEGACY_TO_CANONICAL[low]) return LABEL_BY_CODE[LEGACY_TO_CANONICAL[low]!];
+  if (isCanon(low)) return LABEL_BY_CODE[low as CrmLeadSourceCode];
+  return titleCaseSource(t);
 }
