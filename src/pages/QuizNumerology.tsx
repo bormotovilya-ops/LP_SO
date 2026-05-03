@@ -199,7 +199,6 @@ const QuizNumerology = () => {
   const [financialGoal, setFinancialGoal] = useState("");
   const [investReady, setInvestReady] = useState("");
   const [yearConsequence, setYearConsequence] = useState("");
-  const [policyAccepted, setPolicyAccepted] = useState(false);
   const [sending, setSending] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
@@ -264,8 +263,8 @@ const QuizNumerology = () => {
   }, []);
 
   const attributionGateBlocked = useMemo(() => hasAnyUtm(quizUtm) && !botCtxResolved, [quizUtm, botCtxResolved]);
-  /** Одно согласие с политикой/офертой для «Разбор» и «Подарок». */
-  const quizCtaBlocked = attributionGateBlocked || !policyAccepted;
+  /** CTAs активны без чекбокса: оферта о согласии — текст под кнопками (клик = принятие). */
+  const quizCtaBlocked = attributionGateBlocked;
 
   const focusLabel = useMemo(
     () => (focus ? focusOptions.find((f) => f.key === focus)?.label : null),
@@ -285,15 +284,6 @@ const QuizNumerology = () => {
 
   const submitApplication = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!policyAccepted) {
-      toast({
-        title: "Нужно подтверждение",
-        description: "Подтвердите ознакомление с политикой и офертой.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setSending(true);
     try {
       const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
@@ -408,7 +398,6 @@ const QuizNumerology = () => {
       setFinancialGoal("");
       setInvestReady("");
       setYearConsequence("");
-      setPolicyAccepted(false);
     } catch {
       toast({
         title: "Не удалось отправить",
@@ -631,25 +620,6 @@ const QuizNumerology = () => {
                     )}
 
                     <div className="mt-6 rounded-lg border border-hairline/90 bg-surface/40 p-4 sm:mt-8 sm:p-5 md:p-6">
-                      <label className="mb-4 flex cursor-pointer items-start gap-3 text-left text-sm text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={policyAccepted}
-                          onChange={(e) => setPolicyAccepted(e.target.checked)}
-                          className="mt-1 h-4 w-4 shrink-0"
-                        />
-                        <span>
-                          Ознакомилась с{" "}
-                          <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">
-                            политикой конфиденциальности
-                          </Link>{" "}
-                          и{" "}
-                          <Link to="/oferta" className="text-accent underline-offset-2 hover:underline">
-                            договором оферты
-                          </Link>
-                          .
-                        </span>
-                      </label>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3">
                         <div className="flex min-h-0 flex-col">
                           <button
@@ -690,6 +660,17 @@ const QuizNumerology = () => {
                           </p>
                         </div>
                       </div>
+                      <p className="mt-4 text-left text-[11px] leading-relaxed text-muted-foreground sm:mt-5 sm:text-xs">
+                        Нажимая «Записаться на разбор», «Получить подарок» или отправляя анкету ниже, ты принимаешь{" "}
+                        <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">
+                          политику конфиденциальности
+                        </Link>{" "}
+                        и условия{" "}
+                        <Link to="/oferta" className="text-accent underline-offset-2 hover:underline">
+                          публичной оферты
+                        </Link>
+                        .
+                      </p>
                       {attributionGateBlocked ? (
                         <p className="mt-3 text-center text-[11px] text-muted-foreground sm:text-xs">
                           Готовим ссылку в бота с меткой перехода (реклама / источник)…
