@@ -200,6 +200,7 @@ const QuizNumerology = () => {
   const [investReady, setInvestReady] = useState("");
   const [yearConsequence, setYearConsequence] = useState("");
   const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [giftPolicyAccepted, setGiftPolicyAccepted] = useState(false);
   const [sending, setSending] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
@@ -264,6 +265,7 @@ const QuizNumerology = () => {
   }, []);
 
   const attributionGateBlocked = useMemo(() => hasAnyUtm(quizUtm) && !botCtxResolved, [quizUtm, botCtxResolved]);
+  const giftButtonBlocked = attributionGateBlocked || !giftPolicyAccepted;
 
   const focusLabel = useMemo(
     () => (focus ? focusOptions.find((f) => f.key === focus)?.label : null),
@@ -377,7 +379,7 @@ const QuizNumerology = () => {
         });
         toast({
           title: "Откроем Telegram-бота",
-          description: "После открытия бота обязательно нажмите Start, чтобы заявка закрепилась.",
+          description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
         });
         window.open(
           buildTelegramBotUrl("razbor", { contextToken: botCtxToken ?? undefined }),
@@ -632,9 +634,28 @@ const QuizNumerology = () => {
                           )}
                         </div>
                         <div className="flex min-h-0 flex-col">
+                          <label className="mb-3 flex cursor-pointer items-start gap-3 text-left text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                            <input
+                              type="checkbox"
+                              checked={giftPolicyAccepted}
+                              onChange={(e) => setGiftPolicyAccepted(e.target.checked)}
+                              className="mt-0.5 h-4 w-4 shrink-0"
+                            />
+                            <span>
+                              Ознакомилась с{" "}
+                              <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">
+                                политикой конфиденциальности
+                              </Link>{" "}
+                              и{" "}
+                              <Link to="/oferta" className="text-accent underline-offset-2 hover:underline">
+                                договором оферты
+                              </Link>
+                              .
+                            </span>
+                          </label>
                           <button
                             type="button"
-                            disabled={attributionGateBlocked}
+                            disabled={giftButtonBlocked}
                             onClick={() => {
                               window.open(
                                 buildTelegramBotUrl("present", {
@@ -651,7 +672,7 @@ const QuizNumerology = () => {
                           </button>
                           <p className="mt-1.5 text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">@OSvetlanabot</p>
                           <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
-                            После открытия бота обязательно нажми Start.
+                            После перехода по ссылке старт выполнится автоматически.
                           </p>
                         </div>
                       </div>

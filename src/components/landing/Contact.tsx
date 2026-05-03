@@ -81,7 +81,7 @@ export const Contact = () => {
         });
         toast({
           title: "Откроем Telegram-бота",
-          description: "После открытия бота обязательно нажмите Start, чтобы завершить заявку.",
+          description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
         });
         window.open(buildTelegramBotUrl("diagnostic"), "_blank", "noopener,noreferrer");
       }
