@@ -48,6 +48,55 @@ export const Contact = () => {
 
       const crmLead = (await crmRes.json()) as { contact?: { id?: string } };
 
+      /** Как у квиза: один разовый токен `_ctx_` — webhook подставляет contact_id + телефон в crm_upsert_contact и не плодит второй контакт. */
+      const crmContactId =
+        typeof crmLead.contact?.id === "string" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(crmLead.contact.id)
+          ? crmLead.contact.id.toLowerCase()
+          : undefined;
+
+      let diagnosticBotCtx: string | undefined;
+      try {
+        const tokRes = await fetch(functionsApiUrl("/crm-bot-attribution-token"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            utmSource: "site_form",
+            utmCampaign: "diagnostic",
+          }),
+        });
+        const tokBody = (await tokRes.json().catch(() => ({}))) as { token?: string };
+        if (tokRes.ok && typeof tokBody.token === "string") {
+          diagnosticBotCtx = tokBody.token.toLowerCase();
+          await Promise.all([
+            crmContactId
+              ? fetch(functionsApiUrl("/crm-bot-attribution-token"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "attach_contact",
+                    token: diagnosticBotCtx,
+                    contactId: crmContactId,
+                  }),
+                }).catch(() => undefined)
+              : Promise.resolve(),
+            contact.trim()
+              ? fetch(functionsApiUrl("/crm-bot-attribution-token"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "attach_phone",
+                    token: diagnosticBotCtx,
+                    phone: contact.trim(),
+                  }),
+                }).catch(() => undefined)
+              : Promise.resolve(),
+          ]);
+        }
+      } catch {
+        /* если токен не выдался — открываем бота как раньше (fallback) */
+      }
+
       const res = await fetch(functionsApiUrl("/contact"), {
         method: "POST",
         headers: {
@@ -61,7 +110,7 @@ export const Contact = () => {
           goal,
           message,
           crmEventType: "diagnostic_request_submitted",
-          ...(crmLead.contact?.id ? { crmContactId: crmLead.contact.id } : {}),
+          ...(crmContactId ? { crmContactId } : {}),
         }),
       });
 
@@ -86,7 +135,11 @@ export const Contact = () => {
           title: "Откроем Telegram-бота",
           description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
         });
-        window.open(buildTelegramBotUrl("diagnostic"), "_blank", "noopener,noreferrer");
+        window.open(
+          buildTelegramBotUrl("diagnostic", { contextToken: diagnosticBotCtx }),
+          "_blank",
+          "noopener,noreferrer",
+        );
       }
       form.reset();
     } catch {
