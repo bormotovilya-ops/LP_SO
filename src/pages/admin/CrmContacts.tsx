@@ -25,7 +25,6 @@ import {
   type CrmContactsOwnerFilter,
   type CrmContactsPageSize,
   type CrmContactsSortKey,
-  type CrmContactsGiftFilter,
   type DuplicateFilter,
   type QuickSourcePreset,
   coercePageSize,
@@ -94,15 +93,24 @@ function readStoredState() {
   else if (rawQs === "all") qs = "all";
   else if (rawQs && isCrmLeadSourceCode(rawQs)) qs = rawQs;
 
+  const legacyExact =
+    typeof (s as { exactChannel?: string })?.exactChannel === "string"
+      ? (s as { exactChannel: string }).exactChannel.trim()
+      : "";
+  if (qs === "all" && legacyExact && legacyExact !== ANY_VALUE && isCrmLeadSourceCode(legacyExact)) {
+    qs = legacyExact;
+  }
+
   let ownerFilter: CrmContactsOwnerFilter = "any";
   if (s?.ownerFilter === "mine" || s?.ownerFilter === "unassigned" || s?.ownerFilter === "any") {
     ownerFilter = s.ownerFilter;
   }
 
-  let giftReceivedFilter: CrmContactsGiftFilter = "any";
-  if (s?.giftReceivedFilter === "yes" || s?.giftReceivedFilter === "no") {
-    giftReceivedFilter = s.giftReceivedFilter;
-  }
+  let requireGiftReceived = typeof (s as { requireGiftReceived?: unknown })?.requireGiftReceived === "boolean"
+    ? (s as { requireGiftReceived: boolean }).requireGiftReceived
+    : false;
+  const legacyGift = (s as { giftReceivedFilter?: string })?.giftReceivedFilter;
+  if (!requireGiftReceived && legacyGift === "yes") requireGiftReceived = true;
 
   let sortKey: CrmContactsSortKey = "activity";
   if (s?.sortKey === "next_action" || s?.sortKey === "created" || s?.sortKey === "activity") {
@@ -122,7 +130,6 @@ function readStoredState() {
   return {
     filtersPanelOpen: s?.filtersPanelOpen === true,
     quickSource: qs,
-    exactChannel: typeof s?.exactChannel === "string" ? s.exactChannel : ANY_VALUE,
     stageId: typeof s?.stageId === "string" ? s.stageId : ANY_VALUE,
     temperatureFilter: temp,
     duplicateFilter: duplicateOk,
@@ -132,7 +139,7 @@ function readStoredState() {
     requirePhone: Boolean(s?.requirePhone),
     requireEmail: Boolean(s?.requireEmail),
     consentYesOnly: Boolean(s?.consentYesOnly),
-    giftReceivedFilter,
+    requireGiftReceived,
     ownerFilter,
     sortKey,
     nextActionPreset,
@@ -153,7 +160,6 @@ export default function CrmContacts() {
   const [filtersPanelOpen, setFiltersPanelOpen] = useState(z.filtersPanelOpen);
 
   const [quickSource, setQuickSource] = useState<QuickSourcePreset>(z.quickSource);
-  const [exactChannel, setExactChannel] = useState<string>(z.exactChannel);
   const [stageId, setStageId] = useState<string>(z.stageId);
   const [temperatureFilter, setTemperatureFilter] = useState<
     LeadTemperature | typeof ANY_VALUE
@@ -165,7 +171,7 @@ export default function CrmContacts() {
   const [requirePhone, setRequirePhone] = useState(z.requirePhone);
   const [requireEmail, setRequireEmail] = useState(z.requireEmail);
   const [consentYesOnly, setConsentYesOnly] = useState(z.consentYesOnly);
-  const [giftReceivedFilter, setGiftReceivedFilter] = useState<CrmContactsGiftFilter>(z.giftReceivedFilter);
+  const [requireGiftReceived, setRequireGiftReceived] = useState(z.requireGiftReceived);
   const [ownerFilter, setOwnerFilter] = useState<CrmContactsOwnerFilter>(z.ownerFilter);
   const [sortKey, setSortKey] = useState<CrmContactsSortKey>(z.sortKey);
   const [nextActionPreset, setNextActionPreset] = useState<CrmContactsNextActionPreset>(z.nextActionPreset);
@@ -182,7 +188,6 @@ export default function CrmContacts() {
     setPage(1);
   }, [
     quickSource,
-    exactChannel,
     stageId,
     temperatureFilter,
     duplicateFilter,
@@ -192,7 +197,7 @@ export default function CrmContacts() {
     requirePhone,
     requireEmail,
     consentYesOnly,
-    giftReceivedFilter,
+    requireGiftReceived,
     ownerFilter,
     nextActionPreset,
   ]);
@@ -202,7 +207,6 @@ export default function CrmContacts() {
       v: 1,
       filtersPanelOpen,
       quickSource,
-      exactChannel,
       stageId,
       temperatureFilter,
       duplicateFilter,
@@ -212,7 +216,7 @@ export default function CrmContacts() {
       requirePhone,
       requireEmail,
       consentYesOnly,
-      giftReceivedFilter,
+      requireGiftReceived,
       ownerFilter,
       sortKey,
       nextActionPreset,
@@ -221,9 +225,8 @@ export default function CrmContacts() {
     });
   }, [
     consentYesOnly,
-    giftReceivedFilter,
+    requireGiftReceived,
     duplicateFilter,
-    exactChannel,
     filtersPanelOpen,
     nextActionPreset,
     ownerFilter,
@@ -290,8 +293,7 @@ export default function CrmContacts() {
   const listRpcBase = useMemo(
     () => ({
       p_quick_source: quickSource,
-      p_exact_channel:
-        exactChannel !== ANY_VALUE && String(exactChannel).trim() ? String(exactChannel).trim() : null,
+      p_exact_channel: null,
       p_stage_id: stageId !== ANY_VALUE ? stageId : null,
       p_temperature: temperatureFilter !== ANY_VALUE ? temperatureFilter : null,
       p_duplicate_filter: duplicateFilter,
@@ -301,7 +303,7 @@ export default function CrmContacts() {
       p_require_phone: requirePhone,
       p_require_email: requireEmail,
       p_consent_only: consentYesOnly,
-      p_gift_received_filter: giftReceivedFilter,
+      p_gift_received_filter: requireGiftReceived ? ("yes" as const) : ("any" as const),
       p_owner_filter: ownerFilter,
       p_my_user_id: myUserId,
       p_next_action_preset: nextActionPreset,
@@ -310,9 +312,8 @@ export default function CrmContacts() {
     }),
     [
       consentYesOnly,
-      giftReceivedFilter,
+      requireGiftReceived,
       duplicateFilter,
-      exactChannel,
       myUserId,
       naDayBounds.end,
       naDayBounds.start,
@@ -402,7 +403,6 @@ export default function CrmContacts() {
   const persistSnapshot = {
     filtersPanelOpen,
     quickSource,
-    exactChannel,
     stageId,
     temperatureFilter,
     duplicateFilter,
@@ -412,7 +412,7 @@ export default function CrmContacts() {
     requirePhone,
     requireEmail,
     consentYesOnly,
-    giftReceivedFilter,
+    requireGiftReceived,
     ownerFilter,
     sortKey,
     nextActionPreset,
@@ -424,7 +424,6 @@ export default function CrmContacts() {
 
   const resetFilters = () => {
     setQuickSource("all");
-    setExactChannel(ANY_VALUE);
     setStageId(ANY_VALUE);
     setTemperatureFilter(ANY_VALUE);
     setDuplicateFilter("any");
@@ -434,7 +433,7 @@ export default function CrmContacts() {
     setRequirePhone(false);
     setRequireEmail(false);
     setConsentYesOnly(false);
-    setGiftReceivedFilter("any");
+    setRequireGiftReceived(false);
     setOwnerFilter("any");
     setNextActionPreset("any");
     setPage(1);
@@ -454,7 +453,6 @@ export default function CrmContacts() {
 
   const hasActiveFilters =
     quickSource !== "all" ||
-    exactChannel !== ANY_VALUE ||
     ownerFilter !== "any" ||
     nextActionPreset !== "any" ||
     stageId !== ANY_VALUE ||
@@ -466,7 +464,7 @@ export default function CrmContacts() {
     requirePhone ||
     requireEmail ||
     consentYesOnly ||
-    giftReceivedFilter !== "any";
+    requireGiftReceived;
 
   return (
     <div className="space-y-6">
@@ -531,7 +529,7 @@ export default function CrmContacts() {
             <div className="space-y-4 p-4 pt-5">
               <div className="flex flex-wrap gap-2">
                 <span className="w-full py-1 text-[10px] uppercase tracking-wider text-muted-foreground sm:w-auto">
-                  Источник
+                  Канал
                 </span>
                 {(
                   [{ id: "all" as const, label: "Все", count: quickCounts.all }] as const
@@ -547,12 +545,9 @@ export default function CrmContacts() {
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => {
-                      setQuickSource(opt.id);
-                      setExactChannel(ANY_VALUE);
-                    }}
+                    onClick={() => setQuickSource(opt.id)}
                     className={`rounded-sm border px-3 py-1.5 text-xs transition-colors ${
-                      quickSource === opt.id && exactChannel === ANY_VALUE
+                      quickSource === opt.id
                         ? "border-accent text-accent"
                         : "border-hairline text-muted-foreground hover:text-foreground"
                     }`}
@@ -563,29 +558,6 @@ export default function CrmContacts() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Канал (точное значение)</Label>
-                  <Select
-                    value={exactChannel}
-                    onValueChange={(v) => {
-                      setExactChannel(v);
-                      if (v !== ANY_VALUE) setQuickSource("all");
-                    }}
-                  >
-                    <SelectTrigger className="border-hairline">
-                      <SelectValue placeholder="Все каналы" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ANY_VALUE}>Все каналы</SelectItem>
-                      {CRM_LEAD_SOURCES.map(({ code, label }) => (
-                        <SelectItem key={code} value={code}>
-                          {label} ({code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Этап воронки</Label>
                   <Select value={stageId} onValueChange={setStageId}>
@@ -633,23 +605,6 @@ export default function CrmContacts() {
                       <SelectItem value="any">Все</SelectItem>
                       <SelectItem value="hide">Скрыть дубликаты</SelectItem>
                       <SelectItem value="only">Только дубликаты</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Подарок из бота</Label>
-                  <Select
-                    value={giftReceivedFilter}
-                    onValueChange={(v) => setGiftReceivedFilter(v as CrmContactsGiftFilter)}
-                  >
-                    <SelectTrigger className="border-hairline">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">Все контакты</SelectItem>
-                      <SelectItem value="yes">Подарок получен</SelectItem>
-                      <SelectItem value="no">Подарка ещё не было</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -735,6 +690,10 @@ export default function CrmContacts() {
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <Checkbox checked={consentYesOnly} onCheckedChange={(c) => setConsentYesOnly(c === true)} />
                   Согласие на ПДн
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox checked={requireGiftReceived} onCheckedChange={(c) => setRequireGiftReceived(c === true)} />
+                  Подарок получен
                 </label>
               </div>
             </div>

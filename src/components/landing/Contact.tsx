@@ -46,6 +46,8 @@ export const Contact = () => {
         throw new Error(`CRM upsert failed: ${crmRes.status}`);
       }
 
+      const crmLead = (await crmRes.json()) as { contact?: { id?: string } };
+
       const res = await fetch(functionsApiUrl("/contact"), {
         method: "POST",
         headers: {
@@ -59,6 +61,7 @@ export const Contact = () => {
           goal,
           message,
           crmEventType: "diagnostic_request_submitted",
+          ...(crmLead.contact?.id ? { crmContactId: crmLead.contact.id } : {}),
         }),
       });
 

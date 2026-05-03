@@ -11,8 +11,6 @@ export type CrmContactsOwnerFilter = "any" | "mine" | "unassigned";
 export type CrmContactsSortKey = "activity" | "next_action" | "created";
 /** Быстрый фильтр по полю «следующее действие». */
 export type CrmContactsNextActionPreset = "any" | "scheduled" | "overdue" | "today";
-/** Фильтр по флагу «подарок получен» на контакте. */
-export type CrmContactsGiftFilter = "any" | "yes" | "no";
 
 const LEGAL_PAGE_SIZES = [10, 25, 50, 100] as const;
 export type CrmContactsPageSize = (typeof LEGAL_PAGE_SIZES)[number];
@@ -21,7 +19,6 @@ export type CrmContactsFiltersPersist = {
   v: 1;
   filtersPanelOpen: boolean;
   quickSource: QuickSourcePreset;
-  exactChannel: string;
   stageId: string;
   temperatureFilter: LeadTemperature | "__any__";
   duplicateFilter: DuplicateFilter;
@@ -31,7 +28,8 @@ export type CrmContactsFiltersPersist = {
   requirePhone: boolean;
   requireEmail: boolean;
   consentYesOnly: boolean;
-  giftReceivedFilter: CrmContactsGiftFilter;
+  /** Показать только контакты с флагом «подарок получен». */
+  requireGiftReceived: boolean;
   ownerFilter: CrmContactsOwnerFilter;
   sortKey: CrmContactsSortKey;
   nextActionPreset: CrmContactsNextActionPreset;
@@ -75,11 +73,9 @@ export function saveCrmContactsFilters(s: CrmContactsFiltersPersist) {
 export function summarizeCrmFilters(s: Omit<CrmContactsFiltersPersist, "v">): string | null {
   const parts: string[] = [];
 
-  if (s.exactChannel !== ANY && s.exactChannel) {
-    parts.push(`канал: ${s.exactChannel}`);
-  } else if (s.quickSource !== "all") {
+  if (s.quickSource !== "all") {
     const hit = CRM_LEAD_SOURCES.find((x) => x.code === s.quickSource);
-    parts.push(hit ? `источник: ${hit.label}` : `источник: ${s.quickSource}`);
+    parts.push(hit ? `канал: ${hit.label}` : `канал: ${s.quickSource}`);
   }
 
   if (s.stageId !== ANY && s.stageId) parts.push("этап выбран");
@@ -96,8 +92,7 @@ export function summarizeCrmFilters(s: Omit<CrmContactsFiltersPersist, "v">): st
   if (s.requirePhone) parts.push("есть тел.");
   if (s.requireEmail) parts.push("есть email");
   if (s.consentYesOnly) parts.push("ПДн");
-  if (s.giftReceivedFilter === "yes") parts.push("подарок: да");
-  if (s.giftReceivedFilter === "no") parts.push("подарок: нет");
+  if (s.requireGiftReceived) parts.push("подарок получен");
   if (s.ownerFilter === "mine") parts.push("мои");
   if (s.ownerFilter === "unassigned") parts.push("без ответств.");
   if (s.nextActionPreset === "scheduled") parts.push("есть дата шага");
