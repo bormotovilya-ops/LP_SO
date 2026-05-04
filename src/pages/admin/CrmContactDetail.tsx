@@ -35,6 +35,7 @@ import {
   normalizeCrmLeadSourceCode,
   sourceChannelAdminSelectValue,
 } from "@/lib/crmLeadSources";
+import { telegramAppOpenMessageUrl, telegramWebKChatUrl } from "@/lib/telegramLeadChatLinks";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -116,11 +117,6 @@ function parseTelegramIdForUpdate(raw: string): { ok: true; value: number | null
     return { ok: false, message: "Слишком большой Telegram ID для сохранения в CRM" };
   }
   return { ok: true, value: n };
-}
-
-/** Deep link в приложение Telegram: чат с пользователем по numeric user id. */
-function telegramUserDirectChatHref(telegramId: number): string {
-  return `tg://user?id=${telegramId}`;
 }
 
 export default function CrmContactDetail() {
@@ -551,11 +547,21 @@ export default function CrmContactDetail() {
               <span className="tabular-nums">Telegram ID: {contact.telegram_id}</span>
               {" · "}
               <a
-                href={telegramUserDirectChatHref(contact.telegram_id)}
-                className="text-accent underline-offset-2 hover:underline"
+                href={telegramWebKChatUrl(contact.telegram_id)}
+                target="_blank"
                 rel="noopener noreferrer"
+                className="text-accent underline-offset-2 hover:underline"
+                title="Открыть диалог в браузере (Telegram Web)"
               >
-                Открыть чат в Telegram
+                Веб-версия
+              </a>
+              <span className="text-muted-foreground"> · </span>
+              <a
+                href={telegramAppOpenMessageUrl(contact.telegram_id)}
+                className="text-accent underline-offset-2 hover:underline"
+                title="Открыть в установленном Telegram (tg://openmessage)"
+              >
+                Приложение
               </a>
             </>
           ) : null}
