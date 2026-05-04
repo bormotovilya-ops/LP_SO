@@ -497,3 +497,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/crm-bot-attribution-token/deno.json"
 entrypoint = "./functions/crm-bot-attribution-token/index.ts"
+
+[functions.quiz-result-notify]
+enabled = true
+verify_jwt = true
+import_map = "./functions/quiz-result-notify/deno.json"
+entrypoint = "./functions/quiz-result-notify/index.ts"

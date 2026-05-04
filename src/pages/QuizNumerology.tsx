@@ -632,6 +632,31 @@ const QuizNumerology = () => {
                                   }
                                   setQuizNumber(reduced);
                                   setStep(4);
+                                  const fl =
+                                    focus != null
+                                      ? focusOptions.find((o) => o.key === focus)?.label ?? focus
+                                      : "—";
+                                  const sl =
+                                    situation != null
+                                      ? situationOptions.find((o) => o.key === situation)?.label ?? situation
+                                      : "—";
+                                  void fetch(functionsApiUrl("/quiz-result-notify"), {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
+                                    },
+                                    body: JSON.stringify({
+                                      quizNumber: reduced,
+                                      focusLabel: fl,
+                                      situationLabel: sl,
+                                      utmSource: quizUtm.utmSource ?? undefined,
+                                      utmMedium: quizUtm.utmMedium ?? undefined,
+                                      utmCampaign: quizUtm.utmCampaign ?? undefined,
+                                      utmContent: quizUtm.utmContent ?? undefined,
+                                      utmTerm: quizUtm.utmTerm ?? undefined,
+                                    }),
+                                  }).catch(() => undefined);
                                 }}
                                 className="inline-flex shrink-0 items-center justify-center border border-accent px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground"
                               >
