@@ -118,6 +118,11 @@ function parseTelegramIdForUpdate(raw: string): { ok: true; value: number | null
   return { ok: true, value: n };
 }
 
+/** Deep link в приложение Telegram: чат с пользователем по numeric user id. */
+function telegramUserDirectChatHref(telegramId: number): string {
+  return `tg://user?id=${telegramId}`;
+}
+
 export default function CrmContactDetail() {
   const { id } = useParams<{ id: string }>();
   const { canWriteCrm, isCrmAdmin, user } = useAuth();
@@ -540,7 +545,20 @@ export default function CrmContactDetail() {
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           Источник: {crmLeadSourceLabel(contact.source_channel)}
-          {contact.telegram_id ? ` · Telegram ID: ${contact.telegram_id}` : ""}
+          {contact.telegram_id != null ? (
+            <>
+              {" · "}
+              <span className="tabular-nums">Telegram ID: {contact.telegram_id}</span>
+              {" · "}
+              <a
+                href={telegramUserDirectChatHref(contact.telegram_id)}
+                className="text-accent underline-offset-2 hover:underline"
+                rel="noopener noreferrer"
+              >
+                Открыть чат в Telegram
+              </a>
+            </>
+          ) : null}
         </p>
         {contact.gift_received === true ? (
           <div className="mt-3 rounded-sm border border-accent/35 bg-accent/5 px-3 py-2 text-sm text-foreground">
