@@ -249,11 +249,20 @@ export default function CrmContacts() {
       const { data, error } = await supabase
         .from("crm_pipeline_stages")
         .select("id, code, name, sort_order")
+        .eq("is_active", true)
         .order("sort_order");
       if (error) throw error;
       return (data ?? []) as CrmPipelineStageRow[];
     },
   });
+
+  useEffect(() => {
+    if (stageId === ANY_VALUE) return;
+    if (!stages || stages.length === 0) return;
+    if (!stages.some((s) => s.id === stageId)) {
+      setStageId(ANY_VALUE);
+    }
+  }, [stages, stageId]);
 
   const { data: profileNamesById } = useQuery({
     queryKey: ["crm", "profiles-display-names"],

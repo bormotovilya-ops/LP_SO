@@ -35,7 +35,12 @@ import {
   normalizeCrmLeadSourceCode,
   sourceChannelAdminSelectValue,
 } from "@/lib/crmLeadSources";
-import { telegramAppOpenMessageUrl, telegramWebKChatUrl } from "@/lib/telegramLeadChatLinks";
+import {
+  normalizeTelegramUsername,
+  telegramAppOpenMessageUrl,
+  telegramMeProfileUrlFromUsername,
+  telegramWebKChatUrl,
+} from "@/lib/telegramLeadChatLinks";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -137,6 +142,7 @@ export default function CrmContactDetail() {
       const { data, error } = await supabase
         .from("crm_pipeline_stages")
         .select("id, code, name, sort_order")
+        .eq("is_active", true)
         .order("sort_order");
       if (error) throw error;
       return (data ?? []) as CrmPipelineStageRow[];
@@ -247,6 +253,15 @@ export default function CrmContactDetail() {
       line: interactionBodyFromPayload(row.payload),
     };
   }, [interactions]);
+
+  const telegramPublicHandle = useMemo(
+    () => normalizeTelegramUsername(contact?.telegram_username ?? null),
+    [contact?.telegram_username],
+  );
+  const telegramProfileHref = useMemo(
+    () => telegramMeProfileUrlFromUsername(contact?.telegram_username),
+    [contact?.telegram_username],
+  );
 
   /** Radix Select не допускает value="" и требует совпадения с SelectItem. */
   const stageCodes = useMemo(() => new Set((stages ?? []).map((s) => s.code)), [stages]);
@@ -541,28 +556,46 @@ export default function CrmContactDetail() {
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           Источник: {crmLeadSourceLabel(contact.source_channel)}
-          {contact.telegram_id != null ? (
+          {contact.telegram_id != null || telegramPublicHandle ? (
             <>
               {" · "}
-              <span className="tabular-nums">Telegram ID: {contact.telegram_id}</span>
-              {" · "}
-              <a
-                href={telegramWebKChatUrl(contact.telegram_id)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent underline-offset-2 hover:underline"
-                title="Открыть диалог в браузере (Telegram Web)"
-              >
-                Веб-версия
-              </a>
-              <span className="text-muted-foreground"> · </span>
-              <a
-                href={telegramAppOpenMessageUrl(contact.telegram_id)}
-                className="text-accent underline-offset-2 hover:underline"
-                title="Открыть в установленном Telegram (tg://openmessage)"
-              >
-                Приложение
-              </a>
+              {telegramProfileHref ? (
+                <>
+                  <a
+                    href={telegramProfileHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline-offset-2 hover:underline"
+                    title="Открыть профиль / чат в Telegram (t.me)"
+                  >
+                    @{telegramPublicHandle}
+                  </a>
+                  {contact.telegram_id != null ? <span className="text-muted-foreground"> · </span> : null}
+                </>
+              ) : null}
+              {contact.telegram_id != null ? (
+                <>
+                  <span className="tabular-nums">Telegram ID: {contact.telegram_id}</span>
+                  {" · "}
+                  <a
+                    href={telegramWebKChatUrl(contact.telegram_id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline-offset-2 hover:underline"
+                    title="Открыть диалог в браузере (Telegram Web)"
+                  >
+                    Веб-версия
+                  </a>
+                  <span className="text-muted-foreground"> · </span>
+                  <a
+                    href={telegramAppOpenMessageUrl(contact.telegram_id)}
+                    className="text-accent underline-offset-2 hover:underline"
+                    title="Открыть в установленном Telegram (tg://openmessage)"
+                  >
+                    Приложение
+                  </a>
+                </>
+              ) : null}
             </>
           ) : null}
         </p>

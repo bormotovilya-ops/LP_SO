@@ -12,6 +12,8 @@ type LeadPayload = {
   phone?: string;
   email?: string;
   telegramId?: number | string;
+  /** Публичный @username без обязательного telegramId (нормализуется на сервере). */
+  telegramUsername?: string;
   sourceChannel?: string;
   sourceDetail?: string;
   utmSource?: string;
@@ -55,6 +57,13 @@ function toNullableBigint(raw: unknown): number | null {
     return Number(raw.trim());
   }
   return null;
+}
+
+function toNullableTelegramUsername(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const h = raw.trim().replace(/^@+/, "").toLowerCase();
+  if (!/^[a-z][a-z0-9_]{4,31}$/.test(h)) return null;
+  return h;
 }
 
 function randomHexToken(): string {
@@ -150,6 +159,7 @@ Deno.serve(async (req) => {
     p_phone: toNullableString(body.phone),
     p_email: toNullableString(body.email),
     p_telegram_id: toNullableBigint(body.telegramId),
+    p_telegram_username: toNullableTelegramUsername(body.telegramUsername),
     p_source_channel: toNullableString(body.sourceChannel) ?? "other",
     p_source_detail: toNullableString(body.sourceDetail),
     p_utm_source: toNullableString(body.utmSource),

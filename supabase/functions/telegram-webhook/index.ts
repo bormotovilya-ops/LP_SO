@@ -86,6 +86,16 @@ function telegramUserIdString(fromObj: JsonObject | null): string | null {
   return null;
 }
 
+/** Публичный username для CRM (без @); невалидный / пустой — null. */
+function telegramUsernameForCrm(fromObj: JsonObject | null): string | null {
+  if (!fromObj) return null;
+  const u = fromObj.username;
+  if (typeof u !== "string") return null;
+  const h = u.trim().replace(/^@+/, "").toLowerCase();
+  if (!/^[a-z][a-z0-9_]{4,31}$/.test(h)) return null;
+  return h;
+}
+
 function getChatId(update: JsonObject): number | null {
   const message = update.message;
   if (!message || typeof message !== "object") return null;
@@ -364,6 +374,7 @@ async function savePracticesCollectionTelegramCrm(
     p_phone: null,
     p_email: null,
     p_telegram_id: telegramIdStr,
+    p_telegram_username: telegramUsernameForCrm(from),
     p_source_channel: "bot",
     p_source_detail: "practices_collection_delivery",
     p_utm_source: null,
@@ -571,6 +582,7 @@ async function saveCrmBotEvent(
     p_full_name: fullName || null,
     p_phone: attribution?.phone?.trim() || null,
     p_telegram_id: telegramIdStr,
+    p_telegram_username: telegramUsernameForCrm(from),
     p_source_channel: leadSourceChannel,
     p_source_detail: "telegram-webhook",
     p_segment: giftTrack ?? null,

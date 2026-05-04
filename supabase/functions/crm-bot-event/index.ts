@@ -9,6 +9,7 @@ const CORS_HEADERS = {
 
 type BotEventPayload = {
   telegramId?: number | string;
+  telegramUsername?: string;
   fullName?: string;
   phone?: string;
   email?: string;
@@ -39,6 +40,13 @@ function toNullableBigint(raw: unknown): number | null {
   return null;
 }
 
+function toNullableTelegramUsername(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const h = raw.trim().replace(/^@+/, "").toLowerCase();
+  if (!/^[a-z][a-z0-9_]{4,31}$/.test(h)) return null;
+  return h;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -65,6 +73,7 @@ Deno.serve(async (req) => {
     p_phone: toNullableString(body.phone),
     p_email: toNullableString(body.email),
     p_telegram_id: toNullableBigint(body.telegramId),
+    p_telegram_username: toNullableTelegramUsername(body.telegramUsername),
     p_source_channel: "bot",
     p_source_detail: toNullableString(body.sourceDetail) ?? "bot_event",
     p_comment: null,

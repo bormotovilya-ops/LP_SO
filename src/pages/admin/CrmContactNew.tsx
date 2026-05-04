@@ -70,6 +70,7 @@ export default function CrmContactNew() {
         p_phone: toRpcString(phone),
         p_email: toRpcString(email),
         p_telegram_id: tgNum,
+        p_telegram_username: null,
         p_source_channel: sourceChannel,
         p_source_detail: toRpcString(sourceDetail),
         p_utm_source: null,

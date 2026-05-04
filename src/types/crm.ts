@@ -17,6 +17,8 @@ export type CrmContactRow = {
   phone: string | null;
   email: string | null;
   telegram_id: number | null;
+  /** Публичный @username без «@», если известен (бот / заявка). */
+  telegram_username?: string | null;
   source_channel: string;
   source_detail?: string | null;
   utm_source?: string | null;

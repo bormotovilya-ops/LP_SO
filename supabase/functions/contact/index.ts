@@ -142,6 +142,13 @@ Deno.serve(async (req) => {
       const normalizedContact = normalizePhone(contact);
       const telegramMatch = messenger.match(/@([a-zA-Z0-9_]{3,})/);
       const telegramHandle = telegramMatch ? `@${telegramMatch[1]}` : messenger || null;
+      const telegramUsernameForRpc = telegramMatch
+        ? telegramMatch[1].trim().replace(/^@+/, "").toLowerCase()
+        : null;
+      const telegramUsernameRpc =
+        telegramUsernameForRpc && /^[a-z][a-z0-9_]{4,31}$/.test(telegramUsernameForRpc)
+          ? telegramUsernameForRpc
+          : null;
 
       let contactId: string | null = CRM_CONTACT_ID_RE.test(crmContactIdIn)
         ? crmContactIdIn.toLowerCase()
@@ -153,6 +160,7 @@ Deno.serve(async (req) => {
           p_phone: normalizedContact || null,
           p_email: null,
           p_telegram_id: null,
+          p_telegram_username: telegramUsernameRpc,
           p_source_channel: "site",
           p_source_detail: crmEventType || "diagnostic_request_submitted",
           p_utm_source: utmSource || null,
