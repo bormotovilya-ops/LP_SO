@@ -86,14 +86,54 @@ function telegramUserIdString(fromObj: JsonObject | null): string | null {
   return null;
 }
 
-/** Публичный username для CRM (без @); невалидный / пустой — null. */
+/**
+ * Публичный username для CRM (без @); невалидный / пустой — null.
+ * Правила как у Telegram: 5–32 символа, латиница/цифры/_, начинается с буквы (после lower).
+ */
 function telegramUsernameForCrm(fromObj: JsonObject | null): string | null {
   if (!fromObj) return null;
   const u = fromObj.username;
   if (typeof u !== "string") return null;
   const h = u.trim().replace(/^@+/, "").toLowerCase();
+  if (!h) return null;
   if (!/^[a-z][a-z0-9_]{4,31}$/.test(h)) return null;
   return h;
+}
+
+/** Записать username напрямую в строку лида (дублирует RPC — надёжно при расхождении схемы / типа telegram_id). */
+async function patchCrmTelegramUsername(
+  client: SupabaseClient,
+  telegramIdStr: string,
+  username: string,
+): Promise<void> {
+  const { data: rowsStr, error: errStr } = await client
+    .from("crm_contacts")
+    .update({ telegram_username: username })
+    .eq("telegram_id", telegramIdStr)
+    .select("id");
+  if (errStr) {
+    console.warn("[telegram-webhook] patch telegram_username (eq string):", errStr.message);
+    return;
+  }
+  if (rowsStr && rowsStr.length > 0) return;
+
+  const tidNum = Number(telegramIdStr);
+  if (!Number.isSafeInteger(tidNum) || tidNum <= 0) {
+    console.warn("[telegram-webhook] patch telegram_username: no row for telegram_id", telegramIdStr);
+    return;
+  }
+  const { data: rowsNum, error: errNum } = await client
+    .from("crm_contacts")
+    .update({ telegram_username: username })
+    .eq("telegram_id", tidNum)
+    .select("id");
+  if (errNum) {
+    console.warn("[telegram-webhook] patch telegram_username (eq number):", errNum.message);
+    return;
+  }
+  if (!rowsNum?.length) {
+    console.warn("[telegram-webhook] patch telegram_username: still no row for telegram_id", telegramIdStr);
+  }
 }
 
 function getChatId(update: JsonObject): number | null {
@@ -369,12 +409,13 @@ async function savePracticesCollectionTelegramCrm(
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  await client.rpc("crm_upsert_contact", {
+  const tgUser = telegramUsernameForCrm(from);
+  const { error: pcUpsertErr } = await client.rpc("crm_upsert_contact", {
     p_full_name: fullName || null,
     p_phone: null,
     p_email: null,
     p_telegram_id: telegramIdStr,
-    p_telegram_username: telegramUsernameForCrm(from),
+    p_telegram_username: tgUser,
     p_source_channel: "bot",
     p_source_detail: "practices_collection_delivery",
     p_utm_source: null,
@@ -387,6 +428,13 @@ async function savePracticesCollectionTelegramCrm(
     p_consent_personal_data: false,
     p_comment: "Получение материалов сборника после оплаты",
   });
+  if (pcUpsertErr) {
+    console.error("[telegram-webhook] practices crm_upsert_contact failed:", pcUpsertErr.message);
+    return;
+  }
+  if (tgUser) {
+    await patchCrmTelegramUsername(client, telegramIdStr, tgUser);
+  }
 
   const { data: contacts } = await client
     .from("crm_contacts")
@@ -561,6 +609,11 @@ async function saveCrmBotEvent(
   const lastName = typeof from?.last_name === "string" ? from.last_name : "";
   const fullName = `${firstName} ${lastName}`.trim();
   const telegramIdStr = telegramUserIdString(from);
+  const rawUsername = typeof from?.username === "string" ? from.username.trim() : "";
+  const tgUsername = telegramUsernameForCrm(from);
+  if (rawUsername && !tgUsername) {
+    console.warn("[telegram-webhook] CRM: from.username не прошёл правила:", rawUsername.slice(0, 48));
+  }
 
   if (!telegramIdStr) {
     console.warn("[telegram-webhook] saveCrmBotEvent: отсутствует или некорректный from.id");
@@ -582,7 +635,7 @@ async function saveCrmBotEvent(
     p_full_name: fullName || null,
     p_phone: attribution?.phone?.trim() || null,
     p_telegram_id: telegramIdStr,
-    p_telegram_username: telegramUsernameForCrm(from),
+    p_telegram_username: tgUsername,
     p_source_channel: leadSourceChannel,
     p_source_detail: "telegram-webhook",
     p_segment: giftTrack ?? null,
@@ -600,6 +653,10 @@ async function saveCrmBotEvent(
   if (upsertError) {
     console.error("[telegram-webhook] crm_upsert_contact failed:", upsertError.message);
     return;
+  }
+
+  if (tgUsername) {
+    await patchCrmTelegramUsername(client, telegramIdStr, tgUsername);
   }
 
   if (attribution && attributionToken && /^[a-f0-9]{12}$/i.test(attributionToken)) {
