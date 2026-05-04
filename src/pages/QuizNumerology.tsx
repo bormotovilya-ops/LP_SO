@@ -202,6 +202,8 @@ const QuizNumerology = () => {
   const [sending, setSending] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
+  /** На мобильных: блок с «Твои ответы» + активный шаг — к нему прокручиваем при шагах 2–3 */
+  const quizAnswersAnchorRef = useRef<HTMLDivElement | null>(null);
   const [quizUtm, setQuizUtm] = useState<StoredQuizUtm>(() => computeQuizAttributionBootstrap().merged);
   const [botCtxToken, setBotCtxToken] = useState<string | null>(() => computeQuizAttributionBootstrap().botCtxToken);
   const [botCtxResolved, setBotCtxResolved] = useState(() => computeQuizAttributionBootstrap().botCtxResolved);
@@ -440,6 +442,20 @@ const QuizNumerology = () => {
     return () => cancelAnimationFrame(id);
   }, [step]);
 
+  useLayoutEffect(() => {
+    if (step < 2 || step > 3) return;
+    const mq = window.matchMedia("(max-width: 1023.98px)");
+    if (!mq.matches) return;
+    const id = requestAnimationFrame(() => {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      quizAnswersAnchorRef.current?.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [step]);
+
   return (
     <main className="relative bg-background text-foreground">
       <ThemeSwitcher />
@@ -447,7 +463,10 @@ const QuizNumerology = () => {
         className={cn(
           "relative flex flex-col border-b border-hairline py-3 md:py-4",
           step < 4
-            ? "h-[100dvh] min-h-0 max-h-[100dvh] overflow-hidden"
+            ? cn(
+                "max-lg:min-h-0 max-lg:h-auto max-lg:max-h-none max-lg:overflow-visible",
+                "lg:h-[100dvh] lg:min-h-0 lg:max-h-[100dvh] lg:overflow-hidden"
+              )
             : "min-h-[100dvh] overflow-visible"
         )}
       >
@@ -463,13 +482,30 @@ const QuizNumerology = () => {
             </Link>
           </div>
 
-          <ScrollReveal className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="mt-1 flex min-h-0 min-w-0 flex-1 flex-col md:mt-2">
+          <ScrollReveal
+            className={cn(
+              "flex min-h-0 min-w-0 flex-col",
+              step < 4 ? "max-lg:flex-none lg:flex-1" : "flex-1"
+            )}
+          >
+            <div
+              className={cn(
+                "mt-1 flex min-h-0 min-w-0 flex-col md:mt-2",
+                step < 4 ? "max-lg:flex-none lg:flex-1" : "flex-1"
+              )}
+            >
               <h1 className="shrink-0 max-w-4xl pr-1 font-display text-[clamp(1.35rem,4.2vw,1.7rem)] leading-[1.12] tracking-tight sm:text-3xl sm:pr-0 md:text-[2.4rem] md:leading-[1.08] lg:text-[2.35rem]">
                 Твой потенциал ждет. Пройди тест
               </h1>
 
-              <div className="mt-3 grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] items-stretch gap-3 sm:mt-4 sm:gap-4 lg:mt-3 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:gap-5 xl:gap-6">
+              <div
+                className={cn(
+                  "mt-3 grid min-h-0 min-w-0 grid-cols-1 items-stretch gap-3 sm:mt-4 sm:gap-4 lg:mt-3 lg:grid-cols-12 lg:gap-5 xl:gap-6",
+                  step < 4
+                    ? "max-lg:flex-none max-lg:grid-rows-none lg:flex-1 lg:grid-rows-[minmax(0,1fr)]"
+                    : "flex-1 max-lg:grid-rows-none lg:grid-rows-[minmax(0,1fr)]"
+                )}
+              >
                 <figure className="group relative z-0 min-h-0 shrink-0 self-start lg:col-span-5">
                   <div className="mx-auto w-full max-w-[min(17.5rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-hairline/80 bg-muted/20 shadow-[0_20px_60px_-24px_hsl(var(--foreground)/0.25),0_0_0_1px_hsl(var(--foreground)/0.04)] ring-1 ring-inset ring-white/5 sm:max-w-[22rem] lg:mx-0 lg:max-w-[min(26rem,100%)]">
                     <div className="relative aspect-[3/4] w-full max-lg:mx-auto max-lg:max-h-[min(34dvh,260px)] max-lg:min-h-0">
@@ -491,13 +527,16 @@ const QuizNumerology = () => {
                   </figcaption>
                 </figure>
 
-                <div className="flex min-h-0 min-w-0 flex-col overflow-hidden pt-0.5 lg:col-span-7">
-                  <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain [scrollbar-gutter:stable]">
+                <div className="flex min-h-0 min-w-0 flex-col pt-0.5 max-lg:overflow-visible lg:col-span-7 lg:overflow-hidden">
+                  <div className="min-h-0 min-w-0 overflow-x-hidden max-lg:h-auto max-lg:flex-none max-lg:overflow-visible lg:flex-1 lg:overflow-y-auto lg:overscroll-y-contain lg:[scrollbar-gutter:stable]">
                     <div className={cn("flex flex-col gap-3 sm:gap-3.5", quizStackClass, "pb-1")}>
                       <QuizChatIntro className="w-full shrink-0" />
 
                       {step < 4 && (
-                        <div className="w-full space-y-3">
+                        <div
+                          ref={quizAnswersAnchorRef}
+                          className="w-full scroll-mt-20 space-y-3 sm:scroll-mt-24"
+                        >
                         {step >= 2 && (
                           <AnswerHistoryPanel
                             focusLabel={focusLabel}
