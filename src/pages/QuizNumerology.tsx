@@ -11,7 +11,7 @@ import { Footer } from "@/components/landing/Footer";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { useToast } from "@/hooks/use-toast";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
-import { buildTelegramBotUrl } from "@/lib/botLinks";
+import { buildTelegramBotUrl, getTelegramBotUsername } from "@/lib/botLinks";
 import {
   captureQuizUtmsFromLocation,
   computeQuizAttributionBootstrap,
@@ -734,10 +734,18 @@ const QuizNumerology = () => {
                           >
                             {attributionGateBlocked ? "Подождите…" : "Получить подарок"}
                           </button>
-                          <p className="mt-1.5 text-[11px] text-muted-foreground sm:mt-2 sm:text-xs">@OSvetlanabot</p>
-                          <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
-                            После перехода по ссылке старт выполнится автоматически.
-                          </p>
+                          <div
+                            className="mt-3 w-full space-y-1.5 rounded-md border border-accent/35 bg-gradient-to-b from-accent/10 to-transparent px-3 py-2.5 shadow-sm sm:mt-3 sm:px-3.5 sm:py-3"
+                            role="note"
+                          >
+                            <p className="text-xs font-semibold text-foreground sm:text-sm">
+                              @{getTelegramBotUsername()}
+                            </p>
+                            <p className="text-[11px] leading-relaxed text-foreground/95 sm:text-xs">
+                              После перехода по ссылке старт выполнится автоматически. Подарок придёт в чате с этим
+                              ботом в Telegram — открой диалог и дождись сообщения.
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <p className="mt-4 text-left text-[11px] leading-relaxed text-muted-foreground sm:mt-5 sm:text-xs">
