@@ -738,9 +738,8 @@ const QuizNumerology = () => {
                             className="mt-3 w-full rounded-md border border-accent/35 bg-gradient-to-b from-accent/10 to-transparent px-3 py-2.5 shadow-sm sm:mt-3 sm:px-3.5 sm:py-3"
                             role="note"
                           >
-                            <p className="text-[11px] leading-relaxed text-foreground/95 sm:text-xs">
-                              После перехода по ссылке старт выполнится автоматически. Подарок придёт в чате с ботом в
-                              Telegram — открой диалог и дождись сообщения.
+                            <p className="text-[11px] font-bold leading-relaxed text-foreground sm:text-xs">
+                              Подарок придёт в чате с ботом в Telegram. Запусти его и дождись сообщения.
                             </p>
                           </div>
                         </div>
