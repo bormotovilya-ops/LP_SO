@@ -465,14 +465,14 @@ const QuizNumerology = () => {
 
           <ScrollReveal className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="mt-1 flex min-h-0 min-w-0 flex-1 flex-col md:mt-2">
-              <h1 className="shrink-0 max-w-4xl font-display text-[1.7rem] leading-[1.12] tracking-tight sm:text-3xl md:text-[2.4rem] md:leading-[1.08] lg:text-[2.35rem]">
+              <h1 className="shrink-0 max-w-4xl pr-1 font-display text-[clamp(1.35rem,4.2vw,1.7rem)] leading-[1.12] tracking-tight sm:text-3xl sm:pr-0 md:text-[2.4rem] md:leading-[1.08] lg:text-[2.35rem]">
                 Твой потенциал ждет. Пройди тест
               </h1>
 
-              <div className="mt-3 grid min-h-0 min-w-0 flex-1 grid-cols-1 items-stretch gap-3 sm:mt-4 sm:gap-4 lg:mt-3 lg:grid-cols-12 lg:gap-5 xl:gap-6">
-                <figure className="group relative min-h-0 shrink-0 self-start lg:col-span-5">
-                  <div className="mx-auto w-full max-w-[19rem] overflow-hidden rounded-2xl border border-hairline/80 bg-muted/20 shadow-[0_20px_60px_-24px_hsl(var(--foreground)/0.25),0_0_0_1px_hsl(var(--foreground)/0.04)] ring-1 ring-inset ring-white/5 sm:max-w-[22rem] lg:mx-0 lg:max-w-[min(26rem,100%)]">
-                    <div className="relative aspect-[3/4] w-full">
+              <div className="mt-3 grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] items-stretch gap-3 sm:mt-4 sm:gap-4 lg:mt-3 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:gap-5 xl:gap-6">
+                <figure className="group relative z-0 min-h-0 shrink-0 self-start lg:col-span-5">
+                  <div className="mx-auto w-full max-w-[min(17.5rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-hairline/80 bg-muted/20 shadow-[0_20px_60px_-24px_hsl(var(--foreground)/0.25),0_0_0_1px_hsl(var(--foreground)/0.04)] ring-1 ring-inset ring-white/5 sm:max-w-[22rem] lg:mx-0 lg:max-w-[min(26rem,100%)]">
+                    <div className="relative aspect-[3/4] w-full max-lg:mx-auto max-lg:max-h-[min(34dvh,260px)] max-lg:min-h-0">
                       <img
                         src={quizPortrait}
                         alt="Светлана Ожгихина — бизнес-психолог, портрет"
@@ -485,7 +485,7 @@ const QuizNumerology = () => {
                       />
                     </div>
                   </div>
-                  <figcaption className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[9px] uppercase leading-relaxed tracking-[0.2em] text-muted-foreground sm:text-[10px] lg:justify-start lg:tracking-[0.18em]">
+                  <figcaption className="mt-2 flex max-w-full flex-wrap items-center justify-center gap-1.5 px-1 text-[9px] uppercase leading-relaxed tracking-[0.18em] text-muted-foreground sm:text-[10px] sm:px-0 lg:justify-start lg:tracking-[0.18em]">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
                     <span>Светлана Ожгихина │ Бизнес-психолог | Наставник</span>
                   </figcaption>
