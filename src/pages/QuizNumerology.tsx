@@ -294,6 +294,7 @@ const QuizNumerology = () => {
         body: JSON.stringify({
           fullName: name,
           phone,
+          telegramUsername: telegram.trim() || undefined,
           sourceChannel: "quiz_form",
           sourceDetail: "quiz_review_request",
           segment: focus ?? null,

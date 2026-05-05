@@ -98,6 +98,7 @@ export const Contact = () => {
         body: JSON.stringify({
           fullName: name,
           phone: contact,
+          telegramUsername: messenger.trim() || undefined,
           sourceChannel: "site_form",
           sourceDetail: "diagnostic_request",
           segment: "diagnostic",

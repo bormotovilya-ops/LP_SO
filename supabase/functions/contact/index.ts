@@ -36,6 +36,16 @@ function normalizePhone(raw: string): string {
   return cleaned || raw.trim();
 }
 
+/** Без изменений на сервере crm-lead-upsert (`toNullableTelegramUsername`): 5–32 символа, `a-z`/`0–9`/`_`. */
+function telegramUsernameFromMessenger(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const embedded = t.match(/@([a-z][a-z0-9_]{4,31})(?:[^a-z0-9_]|$)/i);
+  if (embedded?.[1]) return embedded[1].toLowerCase();
+  const stripped = t.replace(/^@+/, "").toLowerCase();
+  return /^[a-z][a-z0-9_]{4,31}$/.test(stripped) ? stripped : null;
+}
+
 /** UUID уже созданный `crm-lead-upsert` — не вызываем второй upsert из этой функции (избегаем дублей контактов). */
 const CRM_CONTACT_ID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -140,14 +150,11 @@ Deno.serve(async (req) => {
       });
 
       const normalizedContact = normalizePhone(contact);
-      const telegramMatch = messenger.match(/@([a-zA-Z0-9_]{3,})/);
-      const telegramHandle = telegramMatch ? `@${telegramMatch[1]}` : messenger || null;
-      const telegramUsernameForRpc = telegramMatch
-        ? telegramMatch[1].trim().replace(/^@+/, "").toLowerCase()
-        : null;
-      const telegramUsernameRpc =
-        telegramUsernameForRpc && /^[a-z][a-z0-9_]{4,31}$/.test(telegramUsernameForRpc)
-          ? telegramUsernameForRpc
+      const telegramUsernameRpc = telegramUsernameFromMessenger(messenger);
+      const telegramHandle = telegramUsernameRpc
+        ? `@${telegramUsernameRpc}`
+        : messenger.trim()
+          ? messenger.trim()
           : null;
 
       let contactId: string | null = CRM_CONTACT_ID_RE.test(crmContactIdIn)
@@ -174,6 +181,12 @@ Deno.serve(async (req) => {
           p_comment: null,
         });
         contactId = (resolvedContact as { id?: string } | null)?.id ?? null;
+      } else if (telegramUsernameRpc) {
+        const { data: row } = await supabase.from("crm_contacts").select("telegram_username").eq("id", contactId).maybeSingle();
+        const cur = typeof row?.telegram_username === "string" ? row.telegram_username.trim() : "";
+        if (!cur) {
+          await supabase.from("crm_contacts").update({ telegram_username: telegramUsernameRpc }).eq("id", contactId);
+        }
       }
 
       if (contactId) {
