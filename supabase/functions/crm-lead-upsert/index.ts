@@ -66,6 +66,38 @@ function toNullableTelegramUsername(raw: unknown): string | null {
   return h;
 }
 
+/** Как на edge `contact`: вложенный @nick или целая строка = ник (5–32 символа по правилам Telegram). */
+function telegramUsernameFromLooseText(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const embedded = t.match(/@([a-z][a-z0-9_]{4,31})(?:[^a-z0-9_]|$)/i);
+  if (embedded?.[1]) return embedded[1].toLowerCase();
+  const stripped = t.replace(/^@+/, "").toLowerCase();
+  return /^[a-z][a-z0-9_]{4,31}$/.test(stripped) ? stripped : null;
+}
+
+function telegramUsernameFromLooseUnknown(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  return telegramUsernameFromLooseText(raw);
+}
+
+/** Подставляем ник в строку контакта из явного поля и из payload взаимодействия (история уже богаче). */
+function resolveTelegramUsernameForRpc(body: LeadPayload): string | null {
+  const fromField = toNullableTelegramUsername(body.telegramUsername) ??
+    telegramUsernameFromLooseUnknown(body.telegramUsername);
+  if (fromField) return fromField;
+
+  const p = body.interaction?.payload;
+  if (!p || typeof p !== "object") return null;
+  const record = p as Record<string, unknown>;
+  const keys = ["telegram", "messenger", "telegram_handle", "telegram_username"] as const;
+  for (const key of keys) {
+    const parsed = toNullableTelegramUsername(record[key]) ?? telegramUsernameFromLooseUnknown(record[key]);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
 function randomHexToken(): string {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
@@ -159,7 +191,7 @@ Deno.serve(async (req) => {
     p_phone: toNullableString(body.phone),
     p_email: toNullableString(body.email),
     p_telegram_id: toNullableBigint(body.telegramId),
-    p_telegram_username: toNullableTelegramUsername(body.telegramUsername),
+    p_telegram_username: resolveTelegramUsernameForRpc(body),
     p_source_channel: toNullableString(body.sourceChannel) ?? "other",
     p_source_detail: toNullableString(body.sourceDetail),
     p_utm_source: toNullableString(body.utmSource),
@@ -176,6 +208,27 @@ Deno.serve(async (req) => {
   const { data: contact, error: upsertError } = await client.rpc("crm_upsert_contact", rpcPayload);
   if (upsertError) {
     return json({ error: "Failed to upsert lead", details: upsertError.message }, 400);
+  }
+
+  /** Если RPC в БД ещё без правки под формы без telegram_id — всё равно заполнить колонку. */
+  const resolvedTgUser = rpcPayload.p_telegram_username;
+  const contactIdAfterUpsert = extractContactId(contact);
+  if (resolvedTgUser && contactIdAfterUpsert) {
+    const { data: row } = await client
+      .from("crm_contacts")
+      .select("telegram_username")
+      .eq("id", contactIdAfterUpsert)
+      .maybeSingle();
+    const cur = typeof row?.telegram_username === "string" ? row.telegram_username.trim() : "";
+    if (!cur) {
+      const { error: patchErr } = await client
+        .from("crm_contacts")
+        .update({ telegram_username: resolvedTgUser })
+        .eq("id", contactIdAfterUpsert);
+      if (patchErr) {
+        console.warn("[crm-lead-upsert] telegram_username patch:", patchErr.message);
+      }
+    }
   }
 
   let botContextToken: string | null = null;

@@ -259,38 +259,29 @@ export const Contact = () => {
             {submitting ? "Отправляем..." : "Отправить заявку"}
           </button>
 
-          <div className="mt-4 space-y-1.5 text-[11px] leading-relaxed text-muted-foreground md:max-w-lg">
-            <p>
-              {diagnosticLinkBlocked ? (
-                <span className="text-muted-foreground">Готовим ссылку в бота с меткой перехода (реклама / источник)…</span>
-              ) : (
-                <a
-                  href={diagnosticBotLinkHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent underline-offset-2 hover:underline"
-                >
-                  @{getTelegramBotUsername()}
-                </a>
-              )}
-              {!diagnosticLinkBlocked && (
-                <>
-                  {" — "}открывает бота по ссылке вида{" "}
-                  <span className="whitespace-nowrap text-foreground/80">t.me/…?start=…</span>
-                  {": "}
-                  это стандартный deep link — Telegram сам отправляет в чат команду{" "}
-                  <span className="whitespace-nowrap text-foreground/80">/start</span> с параметром сценария.
-                  {hasAnyUtm(siteUtm)
-                    ? " UTM из адреса страницы передаются при /start через серверную метку (как после квиза)."
-                    : null}
-                </>
-              )}
-            </p>
-            <p>
-              После перехода по ссылке <strong className="font-medium text-foreground/90">/start выполнится автоматически</strong>
-              {" "}— вводить её вручную не нужно. После успешной отправки заявки откроется та же механика, но с вашей меткой заявки в
-              параметре <span className="whitespace-nowrap text-foreground/80">start</span>.
-            </p>
+          <div className="mt-4 space-y-2 text-[11px] leading-relaxed text-muted-foreground md:max-w-lg">
+            {diagnosticLinkBlocked ? (
+              <p>Готовим ссылку в бота с меткой перехода…</p>
+            ) : (
+              <>
+                <p>
+                  Ваша заявка фиксируется в боте{" "}
+                  <a
+                    href={diagnosticBotLinkHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent underline-offset-2 hover:underline"
+                  >
+                    @{getTelegramBotUsername()}
+                  </a>
+                  .
+                </p>
+                <p>
+                  После перехода по ссылке в боте команда{" "}
+                  <span className="whitespace-nowrap text-foreground/80">/start</span> выполнится автоматически.
+                </p>
+              </>
+            )}
           </div>
 
           <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
