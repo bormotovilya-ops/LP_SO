@@ -72,6 +72,8 @@ function telegramUsernameFromLooseText(raw: string): string | null {
   if (!t) return null;
   const embedded = t.match(/@([a-z][a-z0-9_]{4,31})(?:[^a-z0-9_]|$)/i);
   if (embedded?.[1]) return embedded[1].toLowerCase();
+  const tgLink = t.match(/(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\/([a-z][a-z0-9_]{4,31})(?:[/?#]|$)/i);
+  if (tgLink?.[1]) return tgLink[1].toLowerCase();
   const stripped = t.replace(/^@+/, "").toLowerCase();
   return /^[a-z][a-z0-9_]{4,31}$/.test(stripped) ? stripped : null;
 }
@@ -90,7 +92,14 @@ function resolveTelegramUsernameForRpc(body: LeadPayload): string | null {
   const p = body.interaction?.payload;
   if (!p || typeof p !== "object") return null;
   const record = p as Record<string, unknown>;
-  const keys = ["telegram", "messenger", "telegram_handle", "telegram_username"] as const;
+  const keys = [
+    "telegram",
+    "messenger",
+    "telegram_handle",
+    "telegram_username",
+    "account_link",
+    "accountLink",
+  ] as const;
   for (const key of keys) {
     const parsed = toNullableTelegramUsername(record[key]) ?? telegramUsernameFromLooseUnknown(record[key]);
     if (parsed) return parsed;

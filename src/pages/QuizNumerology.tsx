@@ -12,6 +12,7 @@ import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { useToast } from "@/hooks/use-toast";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import { buildTelegramBotUrl } from "@/lib/botLinks";
+import { parseAccountLink } from "@/lib/socialProfiles";
 import {
   captureQuizUtmsFromLocation,
   computeQuizAttributionBootstrap,
@@ -194,7 +195,8 @@ const QuizNumerology = () => {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [telegram, setTelegram] = useState("");
+  const [communicationChannel, setCommunicationChannel] = useState("");
+  const [accountLink, setAccountLink] = useState("");
   const [income, setIncome] = useState("");
   const [financialGoal, setFinancialGoal] = useState("");
   const [investReady, setInvestReady] = useState("");
@@ -288,13 +290,14 @@ const QuizNumerology = () => {
     e.preventDefault();
     setSending(true);
     try {
+      const parsedAccount = parseAccountLink(accountLink);
       const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName: name,
           phone,
-          telegramUsername: telegram.trim() || undefined,
+          telegramUsername: parsedAccount.telegramUsername ?? undefined,
           sourceChannel: "quiz_form",
           sourceDetail: "quiz_review_request",
           segment: focus ?? null,
@@ -312,7 +315,10 @@ const QuizNumerology = () => {
               quiz_number: quizNumber ?? null,
               focus: focus ?? null,
               situation: situation ?? null,
-              telegram: telegram || null,
+              communication_channel: communicationChannel || null,
+              account_link: accountLink || null,
+              account_platform: parsedAccount.platform,
+              account_handle: parsedAccount.handle,
               income: income || null,
               financial_goal: financialGoal || null,
               invest_ready: investReady || null,
@@ -358,7 +364,8 @@ const QuizNumerology = () => {
         `Текст подарка: ${focus ? giftStubByFocus[focus] : "—"}`,
         `Главный запрос: ${situation ?? "—"}`,
         `Число дня: ${quizNumber ?? "—"}`,
-        `Telegram: ${telegram || "—"}`,
+        `Удобный канал связи: ${communicationChannel || "—"}`,
+        `Ссылка на аккаунт: ${accountLink || "—"}`,
         `Доход: ${income || "—"}`,
         `Финансовая цель: ${financialGoal || "—"}`,
         `Готовность инвестировать: ${investReady || "—"}`,
@@ -374,7 +381,11 @@ const QuizNumerology = () => {
         body: JSON.stringify({
           name,
           contact: phone,
-          messenger: telegram,
+          messenger: communicationChannel,
+          accountLink,
+          socialPlatform: parsedAccount.platform,
+          socialHandle: parsedAccount.handle,
+          telegramUsername: parsedAccount.telegramUsername,
           goal: "Запись на консультацию после квиза",
           message,
           crmEventType: "quiz_completed",
@@ -412,7 +423,8 @@ const QuizNumerology = () => {
       }
       setName("");
       setPhone("");
-      setTelegram("");
+      setCommunicationChannel("");
+      setAccountLink("");
       setIncome("");
       setFinancialGoal("");
       setInvestReady("");
@@ -780,11 +792,12 @@ const QuizNumerology = () => {
                           value={phone}
                           onChange={setPhone}
                         />
+                        <Input label="Удобный канал связи" required value={communicationChannel} onChange={setCommunicationChannel} />
                         <Input
-                          label="Твой ник в Telegram"
+                          label="Ссылка на ваш аккаунт"
                           required
-                          value={telegram}
-                          onChange={setTelegram}
+                          value={accountLink}
+                          onChange={setAccountLink}
                         />
 
                         <Select

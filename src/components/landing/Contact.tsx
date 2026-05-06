@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import { buildTelegramBotUrl, getTelegramBotUsername } from "@/lib/botLinks";
+import { parseAccountLink } from "@/lib/socialProfiles";
 import {
   captureQuizUtmsFromLocation,
   computeQuizAttributionBootstrap,
@@ -14,6 +15,8 @@ import {
   persistQuizUtm,
   utmFingerprint,
 } from "@/lib/quizAttribution";
+
+const incomeOptions = ["До 100 000 ₽", "100 000 - 300 000 ₽", "300 000 - 500 000 ₽", "От 1 000 000 ₽"];
 
 export const Contact = () => {
   const { toast } = useToast();
@@ -87,9 +90,13 @@ export const Contact = () => {
     const formData = new FormData(form);
     const name = String(formData.get("name") ?? "").trim();
     const contact = String(formData.get("contact") ?? "").trim();
-    const messenger = String(formData.get("messenger") ?? "").trim();
-    const goal = String(formData.get("goal") ?? "").trim();
-    const message = String(formData.get("message") ?? "").trim();
+    const communicationChannel = String(formData.get("communicationChannel") ?? "").trim();
+    const accountLink = String(formData.get("accountLink") ?? "").trim();
+    const income = String(formData.get("income") ?? "").trim();
+    const financialGoal = String(formData.get("financialGoal") ?? "").trim();
+    const investReady = String(formData.get("investReady") ?? "").trim();
+    const yearConsequence = String(formData.get("yearConsequence") ?? "").trim();
+    const parsedAccount = parseAccountLink(accountLink);
 
     try {
       const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
@@ -98,7 +105,7 @@ export const Contact = () => {
         body: JSON.stringify({
           fullName: name,
           phone: contact,
-          telegramUsername: messenger.trim() || undefined,
+          telegramUsername: parsedAccount.telegramUsername ?? undefined,
           sourceChannel: "site_form",
           sourceDetail: "diagnostic_request",
           segment: "diagnostic",
@@ -115,9 +122,14 @@ export const Contact = () => {
             direction: "inbound",
             type: "diagnostic_request_submitted",
             payload: {
-              goal: goal || null,
-              messenger: messenger || null,
-              message: message || null,
+              communication_channel: communicationChannel || null,
+              account_link: accountLink || null,
+              account_platform: parsedAccount.platform,
+              account_handle: parsedAccount.handle,
+              income: income || null,
+              financial_goal: financialGoal || null,
+              invest_ready: investReady || null,
+              year_consequence: yearConsequence || null,
             },
           },
         }),
@@ -137,6 +149,16 @@ export const Contact = () => {
       const diagnosticBotCtx =
         typeof crmPayload.botContextToken === "string" ? crmPayload.botContextToken.toLowerCase() : undefined;
 
+      const message = [
+        "Анкета на диагностику/разбор",
+        `Удобный канал связи: ${communicationChannel || "—"}`,
+        `Ссылка на аккаунт: ${accountLink || "—"}`,
+        `Доход: ${income || "—"}`,
+        `Финансовая цель: ${financialGoal || "—"}`,
+        `Готовность инвестировать: ${investReady || "—"}`,
+        `Если оставить все как есть: ${yearConsequence || "—"}`,
+      ].join("\n");
+
       const res = await fetch(functionsApiUrl("/contact"), {
         method: "POST",
         headers: {
@@ -146,8 +168,12 @@ export const Contact = () => {
         body: JSON.stringify({
           name,
           contact,
-          messenger,
-          goal,
+          messenger: communicationChannel,
+          accountLink,
+          socialPlatform: parsedAccount.platform,
+          socialHandle: parsedAccount.handle,
+          telegramUsername: parsedAccount.telegramUsername,
+          goal: "Запись на диагностику/разбор",
           message,
           crmEventType: "diagnostic_request_submitted",
           utmSource: siteUtm.utmSource ?? undefined,
@@ -238,21 +264,13 @@ export const Contact = () => {
         >
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <Field name="name" label="Имя" required />
-            <Field name="contact" label="Телефон или мессенджер" required />
-            <Field name="messenger" label="Удобный канал связи" placeholder="Telegram, WhatsApp..." />
-            <Field name="goal" label="Запрос (коротко)" />
-          </div>
-
-          <div className="mt-6">
-            <label className="block text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-              О ситуации (по желанию)
-            </label>
-            <textarea
-              name="message"
-              rows={4}
-              className="mt-3 w-full border-b border-hairline bg-transparent py-3 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-accent"
-              placeholder="Что сейчас особенно важно для вас?"
-            />
+            <Field name="contact" label="Твой номер телефона" required />
+            <Field name="communicationChannel" label="Удобный канал связи" required placeholder="Telegram, WhatsApp..." />
+            <Field name="accountLink" label="Ссылка на ваш аккаунт" required placeholder="@username или https://..." />
+            <FieldSelect name="income" label="Твой доход в месяц?" required options={incomeOptions} />
+            <Field name="financialGoal" label="Какую финансовую цель хочешь достичь?" required />
+            <Field name="investReady" label="Готова ли инвестировать от 100 тысяч в развитие прямо сейчас?" required />
+            <Field name="yearConsequence" label="Что будет, если оставить все как есть еще на год?" required />
           </div>
 
           <button type="submit" disabled={submitting} className="btn-brass mt-10 w-full md:w-auto">
@@ -323,5 +341,39 @@ const Field = ({
       placeholder={placeholder}
       className="mt-3 w-full border-b border-hairline bg-transparent py-3 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-accent"
     />
+  </div>
+);
+
+const FieldSelect = ({
+  name,
+  label,
+  options,
+  required,
+}: {
+  name: string;
+  label: string;
+  options: string[];
+  required?: boolean;
+}) => (
+  <div>
+    <label className="block text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+      {label}
+      {required && <span className="text-accent"> ·</span>}
+    </label>
+    <select
+      name={name}
+      required={required}
+      defaultValue=""
+      className="mt-3 w-full border-b border-hairline bg-transparent py-3 text-base text-foreground outline-none transition-colors focus:border-accent"
+    >
+      <option value="" disabled>
+        Выбери вариант
+      </option>
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
   </div>
 );

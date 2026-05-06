@@ -36,14 +36,94 @@ function normalizePhone(raw: string): string {
   return cleaned || raw.trim();
 }
 
-/** Без изменений на сервере crm-lead-upsert (`toNullableTelegramUsername`): 5–32 символа, `a-z`/`0–9`/`_`. */
-function telegramUsernameFromMessenger(raw: string): string | null {
+type ParsedSocialAccount = {
+  platform: string;
+  handle: string | null;
+  canonicalUrl: string | null;
+  telegramUsername: string | null;
+};
+
+function parseSocialAccount(raw: string): ParsedSocialAccount {
   const t = raw.trim();
-  if (!t) return null;
-  const embedded = t.match(/@([a-z][a-z0-9_]{4,31})(?:[^a-z0-9_]|$)/i);
-  if (embedded?.[1]) return embedded[1].toLowerCase();
-  const stripped = t.replace(/^@+/, "").toLowerCase();
-  return /^[a-z][a-z0-9_]{4,31}$/.test(stripped) ? stripped : null;
+  if (!t) {
+    return { platform: "unknown", handle: null, canonicalUrl: null, telegramUsername: null };
+  }
+  if (t.startsWith("@")) {
+    const h = t.replace(/^@+/, "").trim();
+    const tg = /^[a-z][a-z0-9_]{4,31}$/i.test(h) ? h.toLowerCase() : null;
+    return {
+      platform: tg ? "telegram" : "unknown",
+      handle: h || null,
+      canonicalUrl: tg ? `https://t.me/${tg}` : null,
+      telegramUsername: tg,
+    };
+  }
+
+  const candidate = /^[a-z][a-z0-9_]{4,31}$/i.test(t) ? t.toLowerCase() : null;
+  if (candidate) {
+    return {
+      platform: "telegram",
+      handle: candidate,
+      canonicalUrl: `https://t.me/${candidate}`,
+      telegramUsername: candidate,
+    };
+  }
+
+  let url: URL | null = null;
+  try {
+    url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`);
+  } catch {
+    url = null;
+  }
+  if (!url) return { platform: "unknown", handle: null, canonicalUrl: null, telegramUsername: null };
+
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  const firstPath = url.pathname.split("/").filter(Boolean)[0] ?? null;
+  const normalizedHandle = firstPath ? firstPath.replace(/^@+/, "") : null;
+
+  if (host === "t.me" || host === "telegram.me") {
+    const tg = normalizedHandle && /^[a-z][a-z0-9_]{4,31}$/i.test(normalizedHandle)
+      ? normalizedHandle.toLowerCase()
+      : null;
+    return {
+      platform: "telegram",
+      handle: normalizedHandle,
+      canonicalUrl: tg ? `https://t.me/${tg}` : `https://${host}${url.pathname}`,
+      telegramUsername: tg,
+    };
+  }
+
+  if (host.includes("instagram.com")) {
+    return {
+      platform: "instagram",
+      handle: normalizedHandle,
+      canonicalUrl: `https://instagram.com/${normalizedHandle ?? ""}`.replace(/\/$/, ""),
+      telegramUsername: null,
+    };
+  }
+  if (host === "vk.com" || host.endsWith(".vk.com")) {
+    return {
+      platform: "vk",
+      handle: normalizedHandle,
+      canonicalUrl: `https://vk.com/${normalizedHandle ?? ""}`.replace(/\/$/, ""),
+      telegramUsername: null,
+    };
+  }
+  if (host === "wa.me" || host.includes("whatsapp")) {
+    return {
+      platform: "whatsapp",
+      handle: normalizedHandle,
+      canonicalUrl: `https://${host}${url.pathname}`,
+      telegramUsername: null,
+    };
+  }
+
+  return {
+    platform: "unknown",
+    handle: normalizedHandle,
+    canonicalUrl: `https://${host}${url.pathname}`,
+    telegramUsername: null,
+  };
 }
 
 /** UUID уже созданный `crm-lead-upsert` — не вызываем второй upsert из этой функции (избегаем дублей контактов). */
@@ -82,6 +162,7 @@ Deno.serve(async (req) => {
   const name = String(body.name ?? "").trim().slice(0, MAX_FIELD);
   const contact = String(body.contact ?? "").trim().slice(0, MAX_FIELD);
   const messenger = String(body.messenger ?? "").trim().slice(0, MAX_FIELD);
+  const accountLink = String(body.accountLink ?? "").trim().slice(0, MAX_FIELD);
   const goal = String(body.goal ?? "").trim().slice(0, MAX_FIELD);
   const message = String(body.message ?? "").trim().slice(0, MAX_FIELD);
   const crmEventType = String(body.crmEventType ?? "diagnostic_request_submitted")
@@ -101,12 +182,15 @@ Deno.serve(async (req) => {
     return json({ error: "Invalid payload" }, 400);
   }
 
+  const parsedAccount = parseSocialAccount(accountLink);
+
   const lines = [
     "<b>Новая заявка с сайта</b>",
     "",
     `<b>Имя:</b> ${escapeHtml(name)}`,
     `<b>Контакт:</b> ${escapeHtml(contact)}`,
     `<b>Удобный канал:</b> ${escapeHtml(messenger || "—")}`,
+    `<b>Ссылка на аккаунт:</b> ${escapeHtml(accountLink || "—")}`,
     `<b>Запрос:</b> ${escapeHtml(goal || "—")}`,
     "",
     "<b>О ситуации:</b>",
@@ -150,11 +234,11 @@ Deno.serve(async (req) => {
       });
 
       const normalizedContact = normalizePhone(contact);
-      const telegramUsernameRpc = telegramUsernameFromMessenger(messenger);
+      const telegramUsernameRpc = parsedAccount.telegramUsername;
       const telegramHandle = telegramUsernameRpc
         ? `@${telegramUsernameRpc}`
-        : messenger.trim()
-          ? messenger.trim()
+        : accountLink.trim()
+          ? accountLink.trim()
           : null;
 
       let contactId: string | null = CRM_CONTACT_ID_RE.test(crmContactIdIn)
@@ -200,6 +284,10 @@ Deno.serve(async (req) => {
             message: message || null,
             messenger: messenger || null,
             telegram_handle: telegramHandle,
+            account_link: accountLink || null,
+            account_platform: parsedAccount.platform,
+            account_handle: parsedAccount.handle,
+            account_url: parsedAccount.canonicalUrl,
             quiz_number: typeof quizNumber === "number" ? quizNumber : null,
             gift_track: giftTrack || null,
           },

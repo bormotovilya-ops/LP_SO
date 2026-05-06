@@ -82,6 +82,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const messenger = String(body.messenger ?? "")
     .trim()
     .slice(0, MAX_FIELD);
+  const accountLink = String(body.accountLink ?? "")
+    .trim()
+    .slice(0, MAX_FIELD);
   const goal = String(body.goal ?? "")
     .trim()
     .slice(0, MAX_FIELD);
@@ -106,6 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `<b>Имя:</b> ${escapeHtml(name)}`,
     `<b>Контакт:</b> ${escapeHtml(contact)}`,
     `<b>Удобный канал:</b> ${escapeHtml(messenger || "—")}`,
+    `<b>Ссылка на аккаунт:</b> ${escapeHtml(accountLink || "—")}`,
     `<b>Запрос:</b> ${escapeHtml(goal || "—")}`,
     "",
     `<b>О ситуации:</b>`,
