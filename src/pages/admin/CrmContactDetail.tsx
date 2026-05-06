@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { getSupabase } from "@/lib/supabaseClient";
-import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
+import { functionsApiUrl } from "@/lib/functionsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -468,11 +468,17 @@ export default function CrmContactDetail() {
     }
     setSendingTelegramMessage(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        toast.error("Сессия истекла. Перезайдите в CRM и повторите отправку.");
+        return;
+      }
       const res = await fetch(functionsApiUrl("/crm-contact-send-message"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           contactId: id,
