@@ -7,6 +7,7 @@ import {
 } from "@/components/quiz/QuizResultNumberOneLuxe";
 import { quizLuxeTextByNumber } from "@/data/quizNumberLuxeTexts";
 import { QuizChatIntro } from "@/components/QuizChatIntro";
+import { PageEditorToggleButton } from "@/components/PageEditorToggleButton";
 import { Footer } from "@/components/landing/Footer";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { useToast } from "@/hooks/use-toast";
@@ -476,6 +477,7 @@ const QuizNumerology = () => {
 
   return (
     <main className="relative bg-background text-foreground">
+      <PageEditorToggleButton />
       <ThemeSwitcher />
       <section
         className={cn(

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Footer } from "@/components/landing/Footer";
+import { PageEditorToggleButton } from "@/components/PageEditorToggleButton";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { buildPracticesCollectionTelegramBotUrl } from "@/lib/botLinks";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
@@ -183,6 +184,7 @@ const PracticesCollectionDebtFreedom = () => {
 
   return (
     <main className="relative min-h-screen bg-background text-foreground">
+      <PageEditorToggleButton />
       <ThemeSwitcher />
       <section className="relative overflow-hidden border-b border-hairline py-12 md:py-20">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,hsl(var(--accent)/0.17),transparent_40%),radial-gradient(circle_at_85%_10%,hsl(var(--primary)/0.18),transparent_38%)]" />
