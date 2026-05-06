@@ -289,6 +289,7 @@ const QuizNumerology = () => {
   const submitApplication = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSending(true);
+    const botWindow = window.open("", "_blank");
     try {
       const parsedAccount = parseAccountLink(accountLink);
       const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
@@ -402,6 +403,7 @@ const QuizNumerology = () => {
 
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
       if (!res.ok || data.ok !== true) {
+        if (botWindow && !botWindow.closed) botWindow.close();
         toast({
           title: "Анкета сохранена в CRM",
           description: "Заявка в Telegram временно не отправлена.",
@@ -415,11 +417,13 @@ const QuizNumerology = () => {
           title: "Откроем Telegram-бота",
           description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
         });
-        window.open(
-          buildTelegramBotUrl("razbor", { contextToken: botCtxToken ?? undefined }),
-          "_blank",
-          "noopener,noreferrer",
-        );
+        const botUrl = buildTelegramBotUrl("razbor", { contextToken: botCtxToken ?? undefined });
+        if (botWindow && !botWindow.closed) {
+          botWindow.location.href = botUrl;
+          botWindow.opener = null;
+        } else {
+          window.open(botUrl, "_blank", "noopener,noreferrer");
+        }
       }
       setName("");
       setPhone("");
@@ -430,6 +434,7 @@ const QuizNumerology = () => {
       setInvestReady("");
       setYearConsequence("");
     } catch {
+      if (botWindow && !botWindow.closed) botWindow.close();
       toast({
         title: "Не удалось отправить",
         description: "Попробуйте позже или напишите в Telegram.",

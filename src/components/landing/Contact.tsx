@@ -86,6 +86,7 @@ export const Contact = () => {
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
+    const botWindow = window.open("", "_blank");
     const form = e.currentTarget;
     const formData = new FormData(form);
     const name = String(formData.get("name") ?? "").trim();
@@ -188,6 +189,7 @@ export const Contact = () => {
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
 
       if (!res.ok || data.ok !== true) {
+        if (botWindow && !botWindow.closed) botWindow.close();
         toast({
           title: "Анкета сохранена в CRM",
           description: "Заявка в Telegram временно не отправлена.",
@@ -201,15 +203,18 @@ export const Contact = () => {
           title: "Откроем Telegram-бота",
           description: "После перехода по ссылке сценарий в боте начнётся автоматически.",
         });
-        window.open(
-          buildTelegramBotUrl("diagnostic", { contextToken: diagnosticBotCtx }),
-          "_blank",
-          "noopener,noreferrer",
-        );
+        const botUrl = buildTelegramBotUrl("diagnostic", { contextToken: diagnosticBotCtx });
+        if (botWindow && !botWindow.closed) {
+          botWindow.location.href = botUrl;
+          botWindow.opener = null;
+        } else {
+          window.open(botUrl, "_blank", "noopener,noreferrer");
+        }
       }
 
       form.reset();
     } catch {
+      if (botWindow && !botWindow.closed) botWindow.close();
       toast({
         title: "Не удалось отправить",
         description: "Попробуйте позже или напишите в Telegram.",
