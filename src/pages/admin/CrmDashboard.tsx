@@ -555,9 +555,9 @@ function CrmDashboardLoaded({ metrics }: { metrics: DashboardMetrics }) {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <Card className="border-hairline bg-surface/20">
           <CardHeader>
-            <CardTitle className="font-display text-lg">Лиды по каналам (источники)</CardTitle>
+            <CardTitle className="font-display text-lg">Лиды по UTM source</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Семь фиксированных источников (агрегация по `source_channel`).
+              Распределение по полю `utm_source`.
             </p>
           </CardHeader>
           <CardContent className="h-[280px] pl-0 pt-2">
