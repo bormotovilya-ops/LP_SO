@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { getSupabase } from "@/lib/supabaseClient";
+import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -278,6 +279,8 @@ export default function CrmContactDetail() {
   const [stageChangeNote, setStageChangeNote] = useState("");
   const [timelineNote, setTimelineNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [telegramMessage, setTelegramMessage] = useState("");
+  const [sendingTelegramMessage, setSendingTelegramMessage] = useState(false);
 
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
@@ -454,6 +457,43 @@ export default function CrmContactDetail() {
     }
   };
 
+  const canSendTelegramViaId = Boolean(contact?.telegram_id != null && !telegramPublicHandle && !readOnly);
+
+  const handleSendTelegramMessage = async () => {
+    if (!id || !contact?.telegram_id || readOnly) return;
+    const text = telegramMessage.trim();
+    if (!text) {
+      toast.error("Введите текст сообщения");
+      return;
+    }
+    setSendingTelegramMessage(true);
+    try {
+      const res = await fetch(functionsApiUrl("/crm-contact-send-message"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
+        },
+        body: JSON.stringify({
+          contactId: id,
+          telegramId: contact.telegram_id,
+          text,
+        }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string; details?: string };
+      if (!res.ok) {
+        toast.error(payload.details ? `${payload.error ?? "Ошибка отправки"}: ${payload.details}` : payload.error ?? "Ошибка отправки");
+        return;
+      }
+      setTelegramMessage("");
+      toast.success("Сообщение отправлено в Telegram");
+      await queryClient.invalidateQueries({ queryKey: ["crm", "interactions", id] });
+      await refetch();
+    } finally {
+      setSendingTelegramMessage(false);
+    }
+  };
+
   const handleAddTask = async () => {
     if (!id || readOnly) return;
     const title = taskTitle.trim();
@@ -599,6 +639,11 @@ export default function CrmContactDetail() {
             </>
           ) : null}
         </p>
+        {contact.telegram_id != null && !telegramPublicHandle ? (
+          <div className="mt-3 rounded-sm border border-accent/35 bg-accent/5 px-3 py-2 text-xs text-foreground">
+            Username Telegram не указан. Связь с контактом доступна через telegram_id и отправку сообщения ботом.
+          </div>
+        ) : null}
         {contact.gift_received === true ? (
           <div className="mt-3 rounded-sm border border-accent/35 bg-accent/5 px-3 py-2 text-sm text-foreground">
             <p className="font-medium text-accent">Подарок получен</p>
@@ -770,6 +815,27 @@ export default function CrmContactDetail() {
               disabled={readOnly}
             />
           </div>
+
+          {contact.telegram_id != null && !telegramPublicHandle ? (
+            <div className="space-y-2 rounded-sm border border-hairline bg-surface/10 p-3">
+              <Label>Сообщение в Telegram по ID</Label>
+              <Textarea
+                value={telegramMessage}
+                onChange={(e) => setTelegramMessage(e.target.value)}
+                placeholder={`Отправка через бота на Telegram ID ${contact.telegram_id}`}
+                className="min-h-[88px] border-hairline"
+                disabled={!canSendTelegramViaId || sendingTelegramMessage}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleSendTelegramMessage}
+                disabled={!canSendTelegramViaId || sendingTelegramMessage}
+              >
+                {sendingTelegramMessage ? "Отправка…" : "Отправить сообщение"}
+              </Button>
+            </div>
+          ) : null}
 
           {readOnly ? null : (
             <Button type="button" onClick={handleSave} disabled={saving} className="w-full sm:w-auto">

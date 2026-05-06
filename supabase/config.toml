@@ -503,3 +503,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/quiz-result-notify/deno.json"
 entrypoint = "./functions/quiz-result-notify/index.ts"
+
+[functions.crm-contact-send-message]
+enabled = true
+verify_jwt = true
+import_map = "./functions/crm-contact-send-message/deno.json"
+entrypoint = "./functions/crm-contact-send-message/index.ts"
