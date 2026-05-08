@@ -53,6 +53,8 @@ Deno.serve(async (req) => {
 
   const focusLabel = trimField(body.focusLabel, 512) || "—";
   const situationLabel = trimField(body.situationLabel, 512) || "—";
+  const communicationChannel = trimField(body.communicationChannel, 256) || "";
+  const accountLink = trimField(body.accountLink, 1024) || "";
   const utmSource = trimField(body.utmSource, 512) || "—";
   const utmMedium = trimField(body.utmMedium, 512) || "—";
   const utmCampaign = trimField(body.utmCampaign, 512) || "—";
@@ -62,11 +64,15 @@ Deno.serve(async (req) => {
   const lines = [
     "<b>Квиз: дошли до результата</b>",
     "",
-    "Пользователь нажал «Мой результат» (расчёт числа по дню рождения).",
+    "Пользователь нажал «Показать результат» (после ввода канала связи и ссылки на аккаунт).",
     "",
     `<b>Число:</b> ${escapeHtml(String(n))}`,
     `<b>Тема:</b> ${escapeHtml(focusLabel)}`,
     `<b>Запрос:</b> ${escapeHtml(situationLabel)}`,
+    ...(communicationChannel
+      ? [`<b>Канал связи:</b> ${escapeHtml(communicationChannel)}`]
+      : []),
+    ...(accountLink ? [`<b>Ссылка на аккаунт:</b> ${escapeHtml(accountLink)}`] : []),
     "",
     "<b>UTM</b>",
     `<b>utm_source:</b> ${escapeHtml(utmSource)}`,

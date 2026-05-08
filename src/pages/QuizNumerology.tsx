@@ -185,9 +185,28 @@ function reduceToOneDigit(dayRaw: string): number | null {
   return n;
 }
 
+const FieldInline = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) => (
+  <div>
+    <label className="block text-[11px] uppercase tracking-[0.22em] text-muted-foreground">{label}</label>
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="mt-2 w-full border border-hairline bg-background px-3 py-2.5 text-base outline-none transition-colors focus:border-accent sm:px-4 sm:py-3"
+    />
+  </div>
+);
+
 const QuizNumerology = () => {
   const { toast } = useToast();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   const [focus, setFocus] = useState<FocusKey | null>(null);
   const [situation, setSituation] = useState<SituationKey | null>(null);
@@ -205,7 +224,7 @@ const QuizNumerology = () => {
   const [sending, setSending] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
-  /** На мобильных: блок с «Твои ответы» + активный шаг — к нему прокручиваем при шагах 2–3 */
+  /** На мобильных: блок с «Твои ответы» + активный шаг — к нему прокручиваем при шагах 2–4 */
   const quizAnswersAnchorRef = useRef<HTMLDivElement | null>(null);
   const [quizUtm, setQuizUtm] = useState<StoredQuizUtm>(() => computeQuizAttributionBootstrap().merged);
   const [botCtxToken, setBotCtxToken] = useState<string | null>(() => computeQuizAttributionBootstrap().botCtxToken);
@@ -454,7 +473,7 @@ const QuizNumerology = () => {
   };
 
   useLayoutEffect(() => {
-    if (step !== 4) return;
+    if (step !== 5) return;
     const id = requestAnimationFrame(() => {
       document.getElementById("quiz-result")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -462,7 +481,7 @@ const QuizNumerology = () => {
   }, [step]);
 
   useLayoutEffect(() => {
-    if (step < 2 || step > 3) return;
+    if (step < 2 || step > 4) return;
     const mq = window.matchMedia("(max-width: 1023.98px)");
     if (!mq.matches) return;
     const id = requestAnimationFrame(() => {
@@ -482,7 +501,7 @@ const QuizNumerology = () => {
       <section
         className={cn(
           "relative flex flex-col border-b border-hairline py-3 md:py-4",
-          step < 4
+          step < 5
             ? cn(
                 "max-lg:min-h-0 max-lg:h-auto max-lg:max-h-none max-lg:overflow-visible",
                 "lg:h-[100dvh] lg:min-h-0 lg:max-h-[100dvh] lg:overflow-hidden"
@@ -505,13 +524,13 @@ const QuizNumerology = () => {
           <ScrollReveal
             className={cn(
               "flex min-h-0 min-w-0 flex-col",
-              step < 4 ? "max-lg:flex-none lg:flex-1" : "flex-1"
+              step < 5 ? "max-lg:flex-none lg:flex-1" : "flex-1"
             )}
           >
             <div
               className={cn(
                 "mt-1 flex min-h-0 min-w-0 flex-col md:mt-2",
-                step < 4 ? "max-lg:flex-none lg:flex-1" : "flex-1"
+                step < 5 ? "max-lg:flex-none lg:flex-1" : "flex-1"
               )}
             >
               <h1 className="shrink-0 max-w-4xl pr-1 font-display text-[clamp(1.35rem,4.2vw,1.7rem)] leading-[1.12] tracking-tight sm:text-3xl sm:pr-0 md:text-[2.4rem] md:leading-[1.08] lg:text-[2.35rem]">
@@ -521,7 +540,7 @@ const QuizNumerology = () => {
               <div
                 className={cn(
                   "mt-3 grid min-h-0 min-w-0 grid-cols-1 items-stretch gap-3 sm:mt-4 sm:gap-4 lg:mt-3 lg:grid-cols-12 lg:gap-5 xl:gap-6",
-                  step < 4
+                  step < 5
                     ? "max-lg:flex-none max-lg:grid-rows-none lg:flex-1 lg:grid-rows-[minmax(0,1fr)]"
                     : "flex-1 max-lg:grid-rows-none lg:grid-rows-[minmax(0,1fr)]"
                 )}
@@ -552,7 +571,7 @@ const QuizNumerology = () => {
                     <div className={cn("flex flex-col gap-3 sm:gap-3.5", quizStackClass, "pb-1")}>
                       <QuizChatIntro className="w-full shrink-0" />
 
-                      {step < 4 && (
+                      {step < 5 && (
                         <div
                           ref={quizAnswersAnchorRef}
                           className="w-full scroll-mt-20 space-y-3 sm:scroll-mt-24"
@@ -561,7 +580,7 @@ const QuizNumerology = () => {
                           <AnswerHistoryPanel
                             focusLabel={focusLabel}
                             situationLabel={situationLabel}
-                            quizNumber={null}
+                            quizNumber={quizNumber}
                             showSituation={step >= 3}
                             showNumber={false}
                           />
@@ -630,7 +649,7 @@ const QuizNumerology = () => {
                               Например: 07= 0+7=7 или 29=2+9=11=1+1=2
                             </p>
                             <p className="mt-1.5 text-sm text-muted-foreground">Какое число получилось?</p>
-                            <p className="mt-0.5 text-sm text-muted-foreground">Нажми эту кнопку ниже 👇</p>
+                            <p className="mt-0.5 text-sm text-muted-foreground">Введи день и нажми «Далее» 👇</p>
                             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch">
                               <input
                                 value={birthDay}
@@ -652,6 +671,51 @@ const QuizNumerology = () => {
                                   }
                                   setQuizNumber(reduced);
                                   setStep(4);
+                                }}
+                                className="inline-flex shrink-0 items-center justify-center border border-accent px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground"
+                              >
+                                Далее
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {step === 4 && (
+                          <div className="w-full border border-hairline bg-surface/40 p-3 sm:p-4">
+                            <h2 className="font-display text-lg sm:text-xl md:text-2xl">Почти готово</h2>
+                            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                              Оставь контакт — и сразу откроется твой персональный разбор.
+                            </p>
+                            <div className="mt-4 space-y-4">
+                              <FieldInline
+                                label="Удобный канал связи ·"
+                                value={communicationChannel}
+                                onChange={setCommunicationChannel}
+                              />
+                              <FieldInline label="Ссылка на ваш аккаунт" value={accountLink} onChange={setAccountLink} />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const ch = communicationChannel.trim();
+                                  const link = accountLink.trim();
+                                  if (!ch) {
+                                    toast({
+                                      title: "Заполните поле",
+                                      description: "Укажите удобный канал связи.",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  if (!link) {
+                                    toast({
+                                      title: "Заполните поле",
+                                      description: "Укажите ссылку на ваш аккаунт.",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  const reduced = quizNumber;
+                                  if (!reduced) return;
                                   const fl =
                                     focus != null
                                       ? focusOptions.find((o) => o.key === focus)?.label ?? focus
@@ -670,6 +734,8 @@ const QuizNumerology = () => {
                                       quizNumber: reduced,
                                       focusLabel: fl,
                                       situationLabel: sl,
+                                      communicationChannel: ch,
+                                      accountLink: link,
                                       utmSource: quizUtm.utmSource ?? undefined,
                                       utmMedium: quizUtm.utmMedium ?? undefined,
                                       utmCampaign: quizUtm.utmCampaign ?? undefined,
@@ -677,10 +743,11 @@ const QuizNumerology = () => {
                                       utmTerm: quizUtm.utmTerm ?? undefined,
                                     }),
                                   }).catch(() => undefined);
+                                  setStep(5);
                                 }}
-                                className="inline-flex shrink-0 items-center justify-center border border-accent px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground"
+                                className="inline-flex w-full items-center justify-center border border-accent px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground sm:w-auto"
                               >
-                                Мой результат
+                                Показать результат
                               </button>
                             </div>
                           </div>
@@ -688,7 +755,7 @@ const QuizNumerology = () => {
                         </div>
                       )}
 
-                      {step === 4 && resultBundle && (
+                      {step === 5 && resultBundle && (
                         <AnswerHistoryPanel
                           focusLabel={focusLabel}
                           situationLabel={situationLabel}
@@ -700,7 +767,7 @@ const QuizNumerology = () => {
                 </div>
               </div>
 
-              {step === 4 && resultBundle && (
+              {step === 5 && resultBundle && (
                 <div className="mt-3 w-full min-w-0 space-y-3 border-t border-hairline/80 pt-4 sm:mt-4 sm:space-y-4 sm:pt-5">
                   <div className="mx-auto w-full max-w-5xl space-y-3 sm:space-y-4">
                   <article
@@ -798,13 +865,6 @@ const QuizNumerology = () => {
                           required
                           value={phone}
                           onChange={setPhone}
-                        />
-                        <Input label="Удобный канал связи" required value={communicationChannel} onChange={setCommunicationChannel} />
-                        <Input
-                          label="Ссылка на ваш аккаунт"
-                          required
-                          value={accountLink}
-                          onChange={setAccountLink}
                         />
 
                         <Select
