@@ -11,6 +11,8 @@ type LeadPayload = {
   fullName?: string;
   phone?: string;
   email?: string;
+  /** Existing CRM contact id to enrich instead of creating duplicate. */
+  resolveContactId?: string;
   telegramId?: number | string;
   /** Публичный @username без обязательного telegramId (нормализуется на сервере). */
   telegramUsername?: string;
@@ -57,6 +59,12 @@ function toNullableBigint(raw: unknown): number | null {
     return Number(raw.trim());
   }
   return null;
+}
+
+function toNullableUuid(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim().toLowerCase();
+  return /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/.test(value) ? value : null;
 }
 
 function toNullableTelegramUsername(raw: unknown): string | null {
@@ -199,6 +207,7 @@ Deno.serve(async (req) => {
     p_full_name: toNullableString(body.fullName),
     p_phone: toNullableString(body.phone),
     p_email: toNullableString(body.email),
+    p_resolve_contact_id: toNullableUuid(body.resolveContactId),
     p_telegram_id: toNullableBigint(body.telegramId),
     p_telegram_username: resolveTelegramUsernameForRpc(body),
     p_source_channel: toNullableString(body.sourceChannel) ?? "other",

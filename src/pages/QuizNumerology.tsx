@@ -46,6 +46,8 @@ const situationOptions: { key: SituationKey; label: string }[] = [
 
 /** Единая ширина: баблы, «Твои ответы», вопросы, блок результата (left + max-width) */
 const quizStackClass = "w-full min-w-0 max-w-[min(100%,44rem)] self-start";
+const CRM_CONTACT_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Число дня 1–9 — планета (нумерология дня): для ответов и подписи к результату */
 const PLANET_BY_NUMBER: Record<
@@ -229,6 +231,8 @@ const QuizNumerology = () => {
   const [quizUtm, setQuizUtm] = useState<StoredQuizUtm>(() => computeQuizAttributionBootstrap().merged);
   const [botCtxToken, setBotCtxToken] = useState<string | null>(() => computeQuizAttributionBootstrap().botCtxToken);
   const [botCtxResolved, setBotCtxResolved] = useState(() => computeQuizAttributionBootstrap().botCtxResolved);
+  const [draftCrmContactId, setDraftCrmContactId] = useState<string | null>(null);
+  const [resultLeadSyncing, setResultLeadSyncing] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -318,6 +322,7 @@ const QuizNumerology = () => {
         body: JSON.stringify({
           fullName: name,
           phone,
+          resolveContactId: draftCrmContactId ?? undefined,
           telegramUsername: parsedAccount.telegramUsername ?? undefined,
           sourceChannel: "quiz_form",
           sourceDetail: "quiz_review_request",
@@ -695,6 +700,7 @@ const QuizNumerology = () => {
                               <FieldInline label="Ссылка на ваш аккаунт" value={accountLink} onChange={setAccountLink} />
                               <button
                                 type="button"
+                                disabled={resultLeadSyncing}
                                 onClick={() => {
                                   const ch = communicationChannel.trim();
                                   const link = accountLink.trim();
@@ -724,30 +730,85 @@ const QuizNumerology = () => {
                                     situation != null
                                       ? situationOptions.find((o) => o.key === situation)?.label ?? situation
                                       : "—";
-                                  void fetch(functionsApiUrl("/quiz-result-notify"), {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                      ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
-                                    },
-                                    body: JSON.stringify({
-                                      quizNumber: reduced,
-                                      focusLabel: fl,
-                                      situationLabel: sl,
-                                      communicationChannel: ch,
-                                      accountLink: link,
-                                      utmSource: quizUtm.utmSource ?? undefined,
-                                      utmMedium: quizUtm.utmMedium ?? undefined,
-                                      utmCampaign: quizUtm.utmCampaign ?? undefined,
-                                      utmContent: quizUtm.utmContent ?? undefined,
-                                      utmTerm: quizUtm.utmTerm ?? undefined,
-                                    }),
-                                  }).catch(() => undefined);
-                                  setStep(5);
+                                  const parsedAccount = parseAccountLink(link);
+                                  void (async () => {
+                                    setResultLeadSyncing(true);
+                                    try {
+                                      const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          telegramUsername: parsedAccount.telegramUsername ?? undefined,
+                                          sourceChannel: "quiz_result",
+                                          sourceDetail: "quiz_result_shown",
+                                          segment: focus ?? null,
+                                          utmSource: quizUtm.utmSource ?? undefined,
+                                          utmMedium: quizUtm.utmMedium ?? undefined,
+                                          utmCampaign: quizUtm.utmCampaign ?? undefined,
+                                          utmContent: quizUtm.utmContent ?? undefined,
+                                          utmTerm: quizUtm.utmTerm ?? undefined,
+                                          consentPersonalData: true,
+                                          interaction: {
+                                            channel: "quiz_form",
+                                            direction: "inbound",
+                                            type: "quiz_result_shown",
+                                            payload: {
+                                              quiz_number: reduced,
+                                              focus: focus ?? null,
+                                              situation: situation ?? null,
+                                              communication_channel: ch,
+                                              account_link: link,
+                                              account_platform: parsedAccount.platform,
+                                              account_handle: parsedAccount.handle,
+                                            },
+                                          },
+                                        }),
+                                      });
+                                      const crmPayload = (await crmRes.json().catch(() => ({}))) as {
+                                        contact?: { id?: string } | Array<{ id?: string }>;
+                                      };
+                                      const rawContact = Array.isArray(crmPayload.contact)
+                                        ? crmPayload.contact[0]
+                                        : crmPayload.contact;
+                                      const contactId = typeof rawContact?.id === "string" ? rawContact.id.trim() : "";
+                                      if (CRM_CONTACT_ID_RE.test(contactId)) {
+                                        setDraftCrmContactId(contactId.toLowerCase());
+                                      }
+                                    } catch {
+                                      // Не блокируем выдачу результата: CRM синхронизация дойдёт на следующих шагах.
+                                    }
+
+                                    try {
+                                      await fetch(functionsApiUrl("/quiz-result-notify"), {
+                                        method: "POST",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                          ...(supabaseFunctionsInvokeHeaders() as Record<string, string>),
+                                        },
+                                        body: JSON.stringify({
+                                          quizNumber: reduced,
+                                          focusLabel: fl,
+                                          situationLabel: sl,
+                                          communicationChannel: ch,
+                                          accountLink: link,
+                                          utmSource: quizUtm.utmSource ?? undefined,
+                                          utmMedium: quizUtm.utmMedium ?? undefined,
+                                          utmCampaign: quizUtm.utmCampaign ?? undefined,
+                                          utmContent: quizUtm.utmContent ?? undefined,
+                                          utmTerm: quizUtm.utmTerm ?? undefined,
+                                        }),
+                                      });
+                                    } catch {
+                                      // Уведомление не должно блокировать переход к результату.
+                                    } finally {
+                                      setResultLeadSyncing(false);
+                                      setStep(5);
+                                    }
+                                  })();
                                 }}
-                                className="inline-flex w-full items-center justify-center border border-accent px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground sm:w-auto"
+                                className="inline-flex w-full items-center justify-center border border-accent px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-45 sm:w-auto"
                               >
-                                Показать результат
+                                {resultLeadSyncing ? "Сохраняем..." : "Показать результат"}
                               </button>
                             </div>
                           </div>
