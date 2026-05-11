@@ -1,0 +1,26 @@
+{
+  "email": "luninskaya@yandex.ru",
+  "sourceChannel": "quiz_result",
+  "sourceDetail": "quiz_result_shown_manual",
+  "segment": "money",
+  "utmSource": "telegram",
+  "utmMedium": "social",
+  "utmCampaign": "numerology_quiz",
+  "utmContent": "post_may",
+  "utmTerm": "",
+  "consentPersonalData": true,
+  "interaction": {
+    "channel": "quiz_form",
+    "direction": "inbound",
+    "type": "quiz_result_shown",
+    "payload": {
+      "quiz_number": 5,
+      "focus": "money",
+      "situation": "start",
+      "communication_channel": "Почта",
+      "account_link": "Luninskaya@yandex.ru",
+      "account_platform": "unknown",
+      "account_handle": null
+    }
+  }
+}

@@ -13,7 +13,7 @@ import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { useToast } from "@/hooks/use-toast";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import { buildTelegramBotUrl } from "@/lib/botLinks";
-import { parseAccountLink } from "@/lib/socialProfiles";
+import { extractPlainEmail, parseAccountLink } from "@/lib/socialProfiles";
 import {
   captureQuizUtmsFromLocation,
   computeQuizAttributionBootstrap,
@@ -316,12 +316,14 @@ const QuizNumerology = () => {
     const botWindow = window.open("", "_blank");
     try {
       const parsedAccount = parseAccountLink(accountLink);
+      const emailFromLink = extractPlainEmail(accountLink);
       const crmRes = await fetch(functionsApiUrl("/crm-lead-upsert"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName: name,
           phone,
+          email: emailFromLink ?? undefined,
           resolveContactId: draftCrmContactId ?? undefined,
           telegramUsername: parsedAccount.telegramUsername ?? undefined,
           sourceChannel: "quiz_form",
@@ -731,6 +733,7 @@ const QuizNumerology = () => {
                                       ? situationOptions.find((o) => o.key === situation)?.label ?? situation
                                       : "—";
                                   const parsedAccount = parseAccountLink(link);
+                                  const emailFromLink = extractPlainEmail(link);
                                   void (async () => {
                                     setResultLeadSyncing(true);
                                     try {
@@ -738,6 +741,7 @@ const QuizNumerology = () => {
                                         method: "POST",
                                         headers: { "Content-Type": "application/json" },
                                         body: JSON.stringify({
+                                          email: emailFromLink ?? undefined,
                                           telegramUsername: parsedAccount.telegramUsername ?? undefined,
                                           sourceChannel: "quiz_result",
                                           sourceDetail: "quiz_result_shown",
@@ -766,16 +770,36 @@ const QuizNumerology = () => {
                                       });
                                       const crmPayload = (await crmRes.json().catch(() => ({}))) as {
                                         contact?: { id?: string } | Array<{ id?: string }>;
+                                        error?: string;
+                                        details?: string;
                                       };
-                                      const rawContact = Array.isArray(crmPayload.contact)
-                                        ? crmPayload.contact[0]
-                                        : crmPayload.contact;
-                                      const contactId = typeof rawContact?.id === "string" ? rawContact.id.trim() : "";
-                                      if (CRM_CONTACT_ID_RE.test(contactId)) {
-                                        setDraftCrmContactId(contactId.toLowerCase());
+                                      if (!crmRes.ok) {
+                                        console.error("[quiz] crm-lead-upsert failed", crmRes.status, crmPayload);
+                                        toast({
+                                          title: "Не удалось сохранить в CRM",
+                                          description:
+                                            (typeof crmPayload.details === "string" && crmPayload.details) ||
+                                            (typeof crmPayload.error === "string" && crmPayload.error) ||
+                                            `Ответ сервера ${crmRes.status}. Уведомление в Telegram может уйти отдельно.`,
+                                          variant: "destructive",
+                                        });
+                                      } else {
+                                        const rawContact = Array.isArray(crmPayload.contact)
+                                          ? crmPayload.contact[0]
+                                          : crmPayload.contact;
+                                        const contactId =
+                                          typeof rawContact?.id === "string" ? rawContact.id.trim() : "";
+                                        if (CRM_CONTACT_ID_RE.test(contactId)) {
+                                          setDraftCrmContactId(contactId.toLowerCase());
+                                        }
                                       }
-                                    } catch {
-                                      // Не блокируем выдачу результата: CRM синхронизация дойдёт на следующих шагах.
+                                    } catch (e) {
+                                      console.error("[quiz] crm-lead-upsert", e);
+                                      toast({
+                                        title: "Сбой сохранения в CRM",
+                                        description: "Проверьте сеть или обновите страницу и попробуйте снова.",
+                                        variant: "destructive",
+                                      });
                                     }
 
                                     try {

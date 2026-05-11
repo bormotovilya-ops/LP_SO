@@ -31,6 +31,14 @@ function normalizeHandlePart(value: string): string | null {
   return cleaned || null;
 }
 
+/** Строка целиком — email (для `crm-lead-upsert` / `p_email`), без URL и userinfo. */
+export function extractPlainEmail(raw: string): string | null {
+  const t = raw.trim().replace(/^mailto:/i, "").split("?")[0]?.trim() ?? "";
+  if (!t || /[\s<>]/.test(t)) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return null;
+  return t.toLowerCase();
+}
+
 export function parseAccountLink(rawInput: string): ParsedAccountLink {
   const raw = cleanup(rawInput);
   if (!raw) {
