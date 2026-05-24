@@ -14,6 +14,25 @@ export type PracticesPaidRecord = {
   orderId?: string;
 };
 
+const ORDER_ID_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isPracticesOrderId(value: string | null | undefined): boolean {
+  const id = value?.trim() ?? "";
+  return Boolean(id && ORDER_ID_UUID_RE.test(id));
+}
+
+/** UUID заказа из localStorage — без него ссылку в канал не выдаём. */
+export function getPracticesPaidOrderId(): string | null {
+  const id = getPracticesPaid()?.orderId?.trim();
+  return isPracticesOrderId(id) ? id! : null;
+}
+
+/** Показывать блок «Войти в канал» только после оплаты с известным orderId. */
+export function canShowPracticesChannelAccess(): boolean {
+  return Boolean(getPracticesPaidOrderId());
+}
+
 function safeParse(raw: string | null): PracticesPaidRecord | null {
   if (!raw) return null;
   try {
@@ -47,8 +66,12 @@ export function clearPracticesPaid(): void {
   window.localStorage.removeItem(PRACTICES_STORAGE_KEY);
 }
 
-/** Убираем следы интеграции с webhook; после возврата с оплаты снова хватает ?pay=ok. */
+/** Убираем следы старой оплаты без orderId (прямая Точка / ?pay=ok без payment-init). */
 export function migratePracticesStorageFromWebhookMode(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(PRACTICES_VERIFIED_ORDER_KEY_V2);
+  const record = getPracticesPaid();
+  if (record && !getPracticesPaidOrderId()) {
+    clearPracticesPaid();
+  }
 }

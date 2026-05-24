@@ -8,7 +8,10 @@ import { PracticesChannelAccess } from "@/components/practices/PracticesChannelA
 import { PracticesCheckoutForm } from "@/components/practices/PracticesCheckoutForm";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import {
+  canShowPracticesChannelAccess,
   getPracticesPaid,
+  getPracticesPaidOrderId,
+  isPracticesOrderId,
   migratePracticesStorageFromWebhookMode,
   PRACTICES_PENDING_ORDER_SESSION_KEY,
   PRACTICES_STORAGE_KEY,
@@ -94,8 +97,8 @@ const PracticesCollectionDebtFreedom = () => {
   const paidCtaAnchorRef = useRef<HTMLDivElement | null>(null);
   /** Инкремент при каждом `?pay=ok`, чтобы прокрутить даже если `practicesPaid` уже был true. */
   const [scrollAfterPaySeq, setScrollAfterPaySeq] = useState(0);
-  const [practicesPaid, setPracticesPaidState] = useState(() =>
-    typeof window !== "undefined" ? Boolean(getPracticesPaid()) : false,
+  const [showChannelAccess, setShowChannelAccess] = useState(() =>
+    typeof window !== "undefined" ? canShowPracticesChannelAccess() : false,
   );
 
   useEffect(() => {
@@ -116,18 +119,29 @@ const PracticesCollectionDebtFreedom = () => {
         oid && uuidRe.test(oid)
           ? oid
           : sessionStorage.getItem(PRACTICES_PENDING_ORDER_SESSION_KEY)?.trim() ??
-            getPracticesPaid()?.orderId;
-      setPracticesPaid(orderId);
-      setPracticesPaidState(true);
+            getPracticesPaidOrderId() ??
+            undefined;
+      if (isPracticesOrderId(orderId)) {
+        setPracticesPaid(orderId);
+        setShowChannelAccess(true);
+        toast({
+          title: "Оплата прошла",
+          description: "Ниже появится одноразовая ссылка в канал со сборником.",
+        });
+        notifyPracticesCollectionLandingChannel(orderId).catch(() => {});
+      } else {
+        setShowChannelAccess(false);
+        toast({
+          title: "Оплата прошла",
+          description:
+            "Если доступ не откроется автоматически, обновите страницу после минуты или напишите в поддержку с email из чека.",
+        });
+        notifyPracticesCollectionLandingChannel(null).catch(() => {});
+      }
       const next = new URLSearchParams(searchParams);
       next.delete("pay");
       next.delete("oid");
       setSearchParams(next, { replace: true });
-      toast({
-        title: "Оплата прошла",
-        description: "Ниже появится одноразовая ссылка в канал со сборником.",
-      });
-      notifyPracticesCollectionLandingChannel(orderId ?? null).catch(() => {});
       return;
     }
 
@@ -145,14 +159,14 @@ const PracticesCollectionDebtFreedom = () => {
       return;
     }
 
-    setPracticesPaidState(Boolean(getPracticesPaid()));
+    setShowChannelAccess(canShowPracticesChannelAccess());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== null && e.key !== PRACTICES_STORAGE_KEY) return;
-      setPracticesPaidState(Boolean(getPracticesPaid()));
+      setShowChannelAccess(canShowPracticesChannelAccess());
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -226,12 +240,12 @@ const PracticesCollectionDebtFreedom = () => {
                 одноразовая ссылка в Telegram-канал.
               </p>
             </div>
-            {!practicesPaid && (
+            {!showChannelAccess && (
               <PracticesCheckoutForm className="w-full min-w-[min(100%,20rem)] shrink-0 lg:max-w-md" />
             )}
           </div>
 
-          {practicesPaid && (
+          {showChannelAccess && (
             <div
               id="practices-access"
               ref={paidCtaAnchorRef}
@@ -309,16 +323,8 @@ const PracticesCollectionDebtFreedom = () => {
               жизнь ❤️
             </p>
             <div className="mt-8 flex flex-col gap-6">
-              {!practicesPaid && (
+              {!showChannelAccess && (
                 <PracticesCheckoutForm buttonLabel={`Перейти к оплате ${practicesPriceLabel}`} />
-              )}
-              {practicesPaid && (
-                <a
-                  href="#practices-access"
-                  className="inline-flex w-fit items-center justify-center border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground"
-                >
-                  Перейти к ссылке в канал
-                </a>
               )}
               <div className="flex flex-wrap items-center gap-3">
               <Link

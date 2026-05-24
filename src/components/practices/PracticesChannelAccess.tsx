@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
-import { getPracticesPaid } from "@/lib/practicesPurchase";
+import { getPracticesPaidOrderId } from "@/lib/practicesPurchase";
 
 const DEFAULT_CHANNEL_POST_URL = "https://t.me/c/3454870164/40";
 const POLL_MS = 3000;
@@ -73,12 +73,11 @@ export function PracticesChannelAccess({ refreshKey = 0 }: PracticesChannelAcces
   const [state, setState] = useState<InviteState>({ status: "idle" });
 
   const loadInvite = useCallback(async () => {
-    const record = getPracticesPaid();
-    const orderId = record?.orderId?.trim();
+    const orderId = getPracticesPaidOrderId();
     if (!orderId) {
       setState({
         status: "error",
-        message: "Нет номера заказа. Оплатите сборник с этой страницы — после возврата ссылка появится здесь.",
+        message: "Не удалось определить заказ. Обновите страницу или оплатите сборник ещё раз.",
       });
       return;
     }
