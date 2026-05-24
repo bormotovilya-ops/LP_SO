@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { usePracticesPricing } from "@/hooks/usePracticesPricing";
 
 type CollectionItem = {
   title: string;
@@ -46,7 +47,7 @@ const PRODUCTS: Product[] = [
     tag: "Самостоятельно",
     title: "Сборники практик",
     desc: "Авторские техники и мини-курсы. Вход в работу без длительных обязательств — для тех, кто хочет начать сам.",
-    price: "4 990 ₽",
+    price: "",
     priceNote: "Цифровые продукты",
     href: "/practices/svoboda-ot-dolgov",
     collections: [
@@ -59,6 +60,8 @@ const PRODUCTS: Product[] = [
 ];
 
 export const Products = () => {
+  const { priceLabel: practicesPriceLabel } = usePracticesPricing();
+
   return (
   <section id="products" className="relative bg-background py-28 md:py-40">
     <div className="container-luxe">
@@ -99,7 +102,9 @@ export const Products = () => {
             <p className="mt-5 text-sm leading-relaxed text-muted-foreground">{p.desc}</p>
 
             <div className="mt-8 border-t border-hairline pt-6">
-              <div className="font-display text-2xl text-accent md:text-3xl">{p.price}</div>
+              <div className="font-display text-2xl text-accent md:text-3xl">
+                {p.collections?.length ? practicesPriceLabel : p.price}
+              </div>
               <div className="mt-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                 {p.priceNote}
               </div>

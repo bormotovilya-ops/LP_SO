@@ -4,8 +4,14 @@ import { createHash, randomUUID } from "crypto";
 const INIT_PROD = "https://securepay.tinkoff.ru/v2/Init";
 const INIT_TEST = "https://rest-api-test.tinkoff.ru/v2/Init";
 
-/** 4 990 ₽ — сумма в копейках для эквайринга Т‑Банка */
-const AMOUNT_KOPECKS = 499000;
+const AMOUNT_KOPECKS_DEFAULT = 499_000;
+
+function getPracticesAmountKopecks(): number {
+  const raw = process.env.PRACTICES_AMOUNT_KOPECKS?.trim();
+  if (!raw) return AMOUNT_KOPECKS_DEFAULT;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 100 ? n : AMOUNT_KOPECKS_DEFAULT;
+}
 
 const RECEIPT_ITEM_NAME = "Сборники практик (цифровой продукт)";
 
@@ -127,6 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const returnPath = normalizeReturnPath(body.returnPath);
 
   const orderId = randomUUID();
+  const amountKopecks = getPracticesAmountKopecks();
 
   const receiptEmailRaw =
     typeof body.receiptEmail === "string"
@@ -176,7 +183,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const payload: JsonRecord = {
       TerminalKey: terminalKey,
-      Amount: AMOUNT_KOPECKS,
+      Amount: amountKopecks,
       OrderId: orderId,
       Description: "Сборники практик",
       Receipt: {
@@ -185,9 +192,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         Items: [
           {
             Name: RECEIPT_ITEM_NAME,
-            Price: AMOUNT_KOPECKS,
+            Price: amountKopecks,
             Quantity: 1,
-            Amount: AMOUNT_KOPECKS,
+            Amount: amountKopecks,
             Tax: itemTax,
             PaymentMethod: "full_payment",
             PaymentObject: "service",
@@ -261,7 +268,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     merchantId,
     orderId,
     amount: {
-      value: (AMOUNT_KOPECKS / 100).toFixed(2),
+      value: (amountKopecks / 100).toFixed(2),
       currency: "RUB",
     },
     description: "Сборники практик",

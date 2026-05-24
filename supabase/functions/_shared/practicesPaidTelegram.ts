@@ -1,3 +1,5 @@
+import { getPracticesPriceLabel } from "./practicesPricing.ts";
+
 const TG_API = "https://api.telegram.org";
 
 function escapeHtml(s: string): string {
@@ -18,7 +20,7 @@ export async function sendPracticesPurchaseTelegram(orderId: string, receiptEmai
     "",
     `<b>OrderId:</b> <code>${escapeHtml(orderId)}</code>`,
     emailLine,
-    "<b>Сумма:</b> 4 990 ₽",
+    `<b>Сумма:</b> ${getPracticesPriceLabel()}`,
     `<b>Время (UTC):</b> <code>${escapeHtml(new Date().toISOString())}</code>`,
   ]
     .filter(Boolean)
@@ -62,7 +64,7 @@ export async function sendPracticesTochkaReturnChannelNotify(orderId?: string | 
     "",
     "<b>Источник:</b> успешный возврат на сайт после оплаты (ссылка Точки)",
     orderLine,
-    "<b>Сумма на витрине:</b> 4 990 ₽",
+    `<b>Сумма на витрине:</b> ${getPracticesPriceLabel()}`,
     `<b>Время (UTC):</b> <code>${escapeHtml(new Date().toISOString())}</code>`,
   ]
     .filter(Boolean)

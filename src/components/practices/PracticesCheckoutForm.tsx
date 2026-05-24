@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { usePracticesPricing } from "@/hooks/usePracticesPricing";
 import { initPracticesCollectionPayment } from "@/lib/practicesPayment";
-
-const PRACTICES_PRICE_LABEL = "4 990 ₽";
 
 const buttonClasses =
   "inline-flex items-center justify-center border border-accent bg-background/85 px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50";
@@ -12,10 +11,9 @@ type PracticesCheckoutFormProps = {
   buttonLabel?: string;
 };
 
-export function PracticesCheckoutForm({
-  className = "",
-  buttonLabel = `Оплатить ${PRACTICES_PRICE_LABEL}`,
-}: PracticesCheckoutFormProps) {
+export function PracticesCheckoutForm({ className = "", buttonLabel }: PracticesCheckoutFormProps) {
+  const { priceLabel } = usePracticesPricing();
+  const resolvedButtonLabel = buttonLabel ?? `Оплатить ${priceLabel}`;
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -53,7 +51,7 @@ export function PracticesCheckoutForm({
         />
       </label>
       <button type="submit" className={`${buttonClasses} shrink-0`} disabled={loading}>
-        {loading ? "Подождите…" : buttonLabel}
+        {loading ? "Подождите…" : resolvedButtonLabel}
       </button>
     </form>
   );

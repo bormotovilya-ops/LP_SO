@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_PAYMENT_PROVIDER?: string;
   /** Первое сообщение в канале сборника (подсказка после invite) */
   readonly VITE_PRACTICES_CHANNEL_POST_URL?: string;
+  /** Копейки для витрины (опционально; иначе GET /practices-config) */
+  readonly VITE_PRACTICES_AMOUNT_KOPECKS?: string;
   /** Канонический домен продакшена без завершающего слэша (https://…). Нужен для canonical, sitemap и абсолютных og:image при сборке. */
   readonly VITE_SITE_URL?: string;
 }

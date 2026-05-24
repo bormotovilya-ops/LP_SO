@@ -2,6 +2,17 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const TG_API = "https://api.telegram.org";
 
+function getPracticesPriceLabel(): string {
+  const raw = process.env.PRACTICES_AMOUNT_KOPECKS?.trim();
+  const kopecks = raw && Number.isFinite(Number.parseInt(raw, 10))
+    ? Number.parseInt(raw, 10)
+    : 499_000;
+  const rubles = kopecks / 100;
+  return kopecks % 100 === 0
+    ? `${Math.round(rubles).toLocaleString("ru-RU")} ₽`
+    : `${rubles.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽`;
+}
+
 async function readJsonBody(req: VercelRequest): Promise<Record<string, unknown>> {
   const raw = req.body as unknown;
   if (raw != null && typeof raw === "string") {
@@ -95,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     "<b>Оплата сборника</b> «Свобода от долгов и кредитов»",
     "",
     `<b>OrderId:</b> <code>${escapeHtml(orderId)}</code>`,
-    "<b>Сумма:</b> 4 990 ₽",
+    `<b>Сумма:</b> ${getPracticesPriceLabel()}`,
     `<b>Время (UTC):</b> <code>${escapeHtml(new Date().toISOString())}</code>`,
   ];
 

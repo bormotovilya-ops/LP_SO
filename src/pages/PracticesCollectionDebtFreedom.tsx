@@ -14,9 +14,8 @@ import {
   PRACTICES_STORAGE_KEY,
   setPracticesPaid,
 } from "@/lib/practicesPurchase";
+import { usePracticesPricing } from "@/hooks/usePracticesPricing";
 import portraitImage from "../../old/фото-16.jpg";
-
-const PRACTICES_PRICE_LABEL = "4 990 ₽";
 
 const blocks = [
   {
@@ -89,6 +88,7 @@ async function notifyPracticesCollectionLandingChannel(orderIdHint?: string | nu
 }
 
 const PracticesCollectionDebtFreedom = () => {
+  const { priceLabel: practicesPriceLabel } = usePracticesPricing();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const paidCtaAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -216,7 +216,7 @@ const PracticesCollectionDebtFreedom = () => {
       <section className="py-16 md:py-20">
         <div className="container-luxe">
           <div className="mb-8 flex flex-wrap items-center gap-4 border border-accent/30 bg-[linear-gradient(115deg,hsl(var(--accent)/0.12),hsl(var(--background))_60%)] px-6 py-5 shadow-[0_16px_42px_-34px_hsl(var(--accent)/0.55)]">
-            <span className="font-display text-3xl text-accent">{PRACTICES_PRICE_LABEL}</span>
+            <span className="font-display text-3xl text-accent">{practicesPriceLabel}</span>
             <div className="min-w-0 flex-1">
               <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
                 Доступ к сборнику
@@ -310,7 +310,7 @@ const PracticesCollectionDebtFreedom = () => {
             </p>
             <div className="mt-8 flex flex-col gap-6">
               {!practicesPaid && (
-                <PracticesCheckoutForm buttonLabel={`Перейти к оплате ${PRACTICES_PRICE_LABEL}`} />
+                <PracticesCheckoutForm buttonLabel={`Перейти к оплате ${practicesPriceLabel}`} />
               )}
               {practicesPaid && (
                 <a

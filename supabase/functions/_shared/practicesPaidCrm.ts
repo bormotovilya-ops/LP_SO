@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { getPracticesAmountKopecks } from "./practicesPricing.ts";
 
 /** Фиксируем в CRM успешную оплату сборника по email из чека (webhook эквайера). */
 export async function recordPracticesPaidCrm(sb: SupabaseClient, orderId: string): Promise<void> {
@@ -49,7 +50,7 @@ export async function recordPracticesPaidCrm(sb: SupabaseClient, orderId: string
     p_payload: {
       orderId,
       product: "practices_svoboda_ot_dolgov",
-      amountKopecks: 499000,
+      amountKopecks: getPracticesAmountKopecks(),
       currency: "RUB",
     },
   });

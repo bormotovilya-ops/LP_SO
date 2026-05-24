@@ -1,11 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceSupabase } from "@lp_so/shared/createServiceSupabase.ts";
 import { practicesInsertInitiated } from "@lp_so/shared/practicesOrdersRepo.ts";
+import { getPracticesAmountKopecks } from "@lp_so/shared/practicesPricing.ts";
 
 const INIT_PROD = "https://securepay.tinkoff.ru/v2/Init";
 const INIT_TEST = "https://rest-api-test.tinkoff.ru/v2/Init";
-// Сборник практик: 4 990 RUB (коп.).
-const AMOUNT_KOPECKS = 499_000;
 const RECEIPT_ITEM_NAME = "Сборники практик (цифровой продукт)";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -128,6 +127,7 @@ Deno.serve(async (req) => {
   }
 
   const orderId = crypto.randomUUID();
+  const amountKopecks = getPracticesAmountKopecks();
 
   try {
     const sb = createServiceSupabase();
@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
       order_id: orderId,
       provider,
       receipt_email: receiptEmail,
-      amount_kopecks: AMOUNT_KOPECKS,
+      amount_kopecks: amountKopecks,
     });
   } catch (e) {
     console.error("[payment-init] practices_payment_orders insert failed", e);
@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
     const itemTax = Deno.env.get("TBANK_RECEIPT_ITEM_TAX")?.trim() || Deno.env.get("TINKOFF_RECEIPT_ITEM_TAX")?.trim() || "none";
     const payload: JsonRecord = {
       TerminalKey: terminalKey,
-      Amount: AMOUNT_KOPECKS,
+      Amount: amountKopecks,
       OrderId: orderId,
       Description: "Сборники практик",
       Receipt: {
@@ -169,9 +169,9 @@ Deno.serve(async (req) => {
         Items: [
           {
             Name: RECEIPT_ITEM_NAME,
-            Price: AMOUNT_KOPECKS,
+            Price: amountKopecks,
             Quantity: 1,
-            Amount: AMOUNT_KOPECKS,
+            Amount: amountKopecks,
             Tax: itemTax,
             PaymentMethod: "full_payment",
             PaymentObject: "service",
@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
     merchantId,
     orderId,
     amount: {
-      value: (AMOUNT_KOPECKS / 100).toFixed(2),
+      value: (amountKopecks / 100).toFixed(2),
       currency: "RUB",
     },
     description: "Сборники практик",
