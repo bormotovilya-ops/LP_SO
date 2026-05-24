@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
-import { getPracticesPaidOrderId } from "@/lib/practicesPurchase";
+import {
+  getPracticesDirectClientToken,
+  getPracticesPaidOrderId,
+} from "@/lib/practicesPurchase";
 
 const DEFAULT_CHANNEL_POST_URL = "https://t.me/c/3454870164/40";
 const POLL_MS = 3000;
@@ -18,7 +21,11 @@ function channelPostUrl(): string {
   return fromEnv || DEFAULT_CHANNEL_POST_URL;
 }
 
-async function fetchChannelInvite(orderId: string): Promise<{
+async function fetchChannelInvite(payload: {
+  orderId?: string;
+  tochkaCheckoutReturn?: boolean;
+  clientToken?: string;
+}): Promise<{
   ok: boolean;
   pending?: boolean;
   inviteLink?: string;
@@ -30,7 +37,7 @@ async function fetchChannelInvite(orderId: string): Promise<{
       ...supabaseFunctionsInvokeHeaders(),
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ orderId }),
+    body: JSON.stringify(payload),
   });
   let data: { ok?: boolean; pending?: boolean; inviteLink?: string; error?: string } = {};
   try {
@@ -65,7 +72,6 @@ async function checkPaid(orderId: string): Promise<boolean> {
 }
 
 type PracticesChannelAccessProps = {
-  /** Перезапуск загрузки ссылки (например после ?pay=ok). */
   refreshKey?: number;
 };
 
@@ -74,29 +80,36 @@ export function PracticesChannelAccess({ refreshKey = 0 }: PracticesChannelAcces
 
   const loadInvite = useCallback(async () => {
     const orderId = getPracticesPaidOrderId();
-    if (!orderId) {
+    const clientToken = getPracticesDirectClientToken();
+    const payload = orderId
+      ? { orderId }
+      : clientToken
+        ? { tochkaCheckoutReturn: true, clientToken }
+        : null;
+
+    if (!payload) {
       setState({
         status: "error",
-        message: "Не удалось определить заказ. Обновите страницу или оплатите сборник ещё раз.",
+        message: "Сначала оплатите сборник на этой странице — затем откроется доступ в канал.",
       });
       return;
     }
 
     setState({ status: "loading" });
 
-    let result = await fetchChannelInvite(orderId);
+    let result = await fetchChannelInvite(payload);
     if (result.ok && result.inviteLink) {
       setState({ status: "ready", inviteLink: result.inviteLink });
       return;
     }
 
-    if (result.pending) {
+    if (result.pending && orderId) {
       setState({ status: "waiting_payment" });
       for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
         await new Promise((r) => setTimeout(r, POLL_MS));
         const paid = await checkPaid(orderId);
         if (!paid) continue;
-        result = await fetchChannelInvite(orderId);
+        result = await fetchChannelInvite({ orderId });
         if (result.ok && result.inviteLink) {
           setState({ status: "ready", inviteLink: result.inviteLink });
           return;

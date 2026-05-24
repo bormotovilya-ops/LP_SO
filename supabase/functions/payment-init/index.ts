@@ -253,6 +253,11 @@ Deno.serve(async (req) => {
     tochkaPayload.successUrl = joinReturn("ok");
     tochkaPayload.failUrl = joinReturn("fail");
   }
+  const functionsBase = (Deno.env.get("FUNCTIONS_BASE_URL")?.trim() || "").replace(/\/+$/, "");
+  if (functionsBase) {
+    tochkaPayload.callbackUrl = Deno.env.get("TOCHKA_CALLBACK_URL")?.trim() ||
+      `${functionsBase}/tochka-notification`;
+  }
 
   let tochkaRes: Response;
   try {
@@ -264,8 +269,18 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify(tochkaPayload),
     });
-  } catch {
-    return json({ error: "Payment gateway unreachable" }, 502);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("[payment-init] Tochka fetch failed", { initUrl, detail });
+    return json(
+      {
+        error:
+          "Не удалось связаться с API Точки. Проверьте TOCHKA_INIT_URL (или TOCHKA_API_BASE_URL) в Secrets и логи payment-init.",
+        code: "TOCHKA_UNREACHABLE",
+        detail,
+      },
+      502,
+    );
   }
 
   let gatewayJson: JsonRecord = {};

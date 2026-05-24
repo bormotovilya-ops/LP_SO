@@ -1,7 +1,6 @@
-/** Дефолт: 4 990 ₽. Переопределение: Supabase Secret `PRACTICES_AMOUNT_KOPECKS` (копейки). */
+/** Дефолт витрины. Переопределение: Secret `PRACTICES_AMOUNT_KOPECKS` (копейки). */
 export const PRACTICES_AMOUNT_KOPECKS_DEFAULT = 499_000;
 
-/** Минимум 1 ₽ — защита от опечаток в секрете. */
 const PRACTICES_AMOUNT_KOPECKS_MIN = 100;
 
 export function getPracticesAmountKopecks(): number {
@@ -9,10 +8,7 @@ export function getPracticesAmountKopecks(): number {
   if (!raw) return PRACTICES_AMOUNT_KOPECKS_DEFAULT;
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n < PRACTICES_AMOUNT_KOPECKS_MIN) {
-    console.warn(
-      "[practicesPricing] invalid PRACTICES_AMOUNT_KOPECKS, using default",
-      raw,
-    );
+    console.warn("[practicesPricing] invalid PRACTICES_AMOUNT_KOPECKS, using default", raw);
     return PRACTICES_AMOUNT_KOPECKS_DEFAULT;
   }
   return n;

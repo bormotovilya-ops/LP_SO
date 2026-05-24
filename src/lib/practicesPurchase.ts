@@ -1,20 +1,26 @@
 /** Ключ в localStorage; можно слушать `storage` в других вкладках */
 export const PRACTICES_STORAGE_KEY = "lp_so_practices_paid_v1";
 
-/** Старый режим «только после webhook»: убираем при первом открытии страницы */
 const PRACTICES_VERIFIED_ORDER_KEY_V2 = "lp_so_practices_verified_order_v2";
 
-/** sessionStorage: OrderId из Init до возврата с формы оплаты */
+/** sessionStorage: OrderId из payment-init до возврата (если снова включат API-оплату) */
 export const PRACTICES_PENDING_ORDER_SESSION_KEY = "lp_so_pending_payment_order_v1";
 
+export const PRACTICES_DIRECT_CLIENT_TOKEN_KEY = "lp_so_practices_direct_token_v1";
+
+export type PracticesAccessMode = "payment_init" | "tochka_checkout";
+
 export type PracticesPaidRecord = {
-  /** ISO-время фиксации успешного возврата после проверки оплаты или ?pay=ok */
   paidAt: string;
-  /** OrderId из payment-init — для выдачи invite в канал */
   orderId?: string;
+  accessMode?: PracticesAccessMode;
+  clientToken?: string;
 };
 
 const ORDER_ID_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const CLIENT_TOKEN_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isPracticesOrderId(value: string | null | undefined): boolean {
@@ -22,15 +28,28 @@ export function isPracticesOrderId(value: string | null | undefined): boolean {
   return Boolean(id && ORDER_ID_UUID_RE.test(id));
 }
 
-/** UUID заказа из localStorage — без него ссылку в канал не выдаём. */
+export function isPracticesDirectClientToken(value: string | null | undefined): boolean {
+  const t = value?.trim() ?? "";
+  return Boolean(t && CLIENT_TOKEN_RE.test(t));
+}
+
 export function getPracticesPaidOrderId(): string | null {
   const id = getPracticesPaid()?.orderId?.trim();
   return isPracticesOrderId(id) ? id! : null;
 }
 
-/** Показывать блок «Войти в канал» только после оплаты с известным orderId. */
+export function getPracticesDirectClientToken(): string | null {
+  const record = getPracticesPaid();
+  if (record?.accessMode === "tochka_checkout" && isPracticesDirectClientToken(record.clientToken)) {
+    return record.clientToken!.trim();
+  }
+  if (typeof sessionStorage === "undefined") return null;
+  const fromSession = sessionStorage.getItem(PRACTICES_DIRECT_CLIENT_TOKEN_KEY)?.trim();
+  return isPracticesDirectClientToken(fromSession) ? fromSession! : null;
+}
+
 export function canShowPracticesChannelAccess(): boolean {
-  return Boolean(getPracticesPaidOrderId());
+  return Boolean(getPracticesPaidOrderId() || getPracticesDirectClientToken());
 }
 
 function safeParse(raw: string | null): PracticesPaidRecord | null {
@@ -42,7 +61,15 @@ function safeParse(raw: string | null): PracticesPaidRecord | null {
     if (typeof paidAt !== "string" || !paidAt) return null;
     const orderIdRaw = (o as { orderId?: unknown }).orderId;
     const orderId = typeof orderIdRaw === "string" && orderIdRaw.trim() ? orderIdRaw.trim() : undefined;
-    return orderId ? { paidAt, orderId } : { paidAt };
+    const accessModeRaw = (o as { accessMode?: unknown }).accessMode;
+    const accessMode =
+      accessModeRaw === "tochka_checkout" || accessModeRaw === "payment_init"
+        ? accessModeRaw
+        : undefined;
+    const clientTokenRaw = (o as { clientToken?: unknown }).clientToken;
+    const clientToken =
+      typeof clientTokenRaw === "string" && clientTokenRaw.trim() ? clientTokenRaw.trim() : undefined;
+    return { paidAt, ...(orderId ? { orderId } : {}), ...(accessMode ? { accessMode } : {}), ...(clientToken ? { clientToken } : {}) };
   } catch {
     return null;
   }
@@ -56,7 +83,23 @@ export function getPracticesPaid(): PracticesPaidRecord | null {
 export function setPracticesPaid(orderId?: string): PracticesPaidRecord {
   const record: PracticesPaidRecord = {
     paidAt: new Date().toISOString(),
+    accessMode: "payment_init",
     ...(orderId?.trim() ? { orderId: orderId.trim() } : {}),
+  };
+  window.localStorage.setItem(PRACTICES_STORAGE_KEY, JSON.stringify(record));
+  return record;
+}
+
+/** Возврат с прямой страницы оплаты Точки (?pay=ok). */
+export function setPracticesPaidFromTochkaCheckout(): PracticesPaidRecord {
+  const clientToken = crypto.randomUUID();
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.setItem(PRACTICES_DIRECT_CLIENT_TOKEN_KEY, clientToken);
+  }
+  const record: PracticesPaidRecord = {
+    paidAt: new Date().toISOString(),
+    accessMode: "tochka_checkout",
+    clientToken,
   };
   window.localStorage.setItem(PRACTICES_STORAGE_KEY, JSON.stringify(record));
   return record;
@@ -64,14 +107,16 @@ export function setPracticesPaid(orderId?: string): PracticesPaidRecord {
 
 export function clearPracticesPaid(): void {
   window.localStorage.removeItem(PRACTICES_STORAGE_KEY);
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem(PRACTICES_DIRECT_CLIENT_TOKEN_KEY);
+  }
 }
 
-/** Убираем следы старой оплаты без orderId (прямая Точка / ?pay=ok без payment-init). */
 export function migratePracticesStorageFromWebhookMode(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(PRACTICES_VERIFIED_ORDER_KEY_V2);
   const record = getPracticesPaid();
-  if (record && !getPracticesPaidOrderId()) {
+  if (record && !canShowPracticesChannelAccess()) {
     clearPracticesPaid();
   }
 }

@@ -5,20 +5,26 @@ import { Footer } from "@/components/landing/Footer";
 import { PageEditorToggleButton } from "@/components/PageEditorToggleButton";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
 import { PracticesChannelAccess } from "@/components/practices/PracticesChannelAccess";
-import { PracticesCheckoutForm } from "@/components/practices/PracticesCheckoutForm";
+import { getTochkaCheckoutUrl } from "@/lib/practicesCheckout";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
+import { PRACTICES_PRICE_LABEL } from "@/lib/practicesPricing";
 import {
   canShowPracticesChannelAccess,
-  getPracticesPaid,
   getPracticesPaidOrderId,
   isPracticesOrderId,
   migratePracticesStorageFromWebhookMode,
   PRACTICES_PENDING_ORDER_SESSION_KEY,
   PRACTICES_STORAGE_KEY,
   setPracticesPaid,
+  setPracticesPaidFromTochkaCheckout,
 } from "@/lib/practicesPurchase";
-import { usePracticesPricing } from "@/hooks/usePracticesPricing";
 import portraitImage from "../../old/фото-16.jpg";
+
+const checkoutButtonClasses =
+  "inline-flex items-center justify-center border border-accent bg-background/85 px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground";
+
+const checkoutButtonClassesSecondary =
+  "inline-flex items-center justify-center border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground";
 
 const blocks = [
   {
@@ -91,7 +97,7 @@ async function notifyPracticesCollectionLandingChannel(orderIdHint?: string | nu
 }
 
 const PracticesCollectionDebtFreedom = () => {
-  const { priceLabel: practicesPriceLabel } = usePracticesPricing();
+  const tochkaCheckoutUrl = getTochkaCheckoutUrl();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const paidCtaAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -130,11 +136,11 @@ const PracticesCollectionDebtFreedom = () => {
         });
         notifyPracticesCollectionLandingChannel(orderId).catch(() => {});
       } else {
-        setShowChannelAccess(false);
+        setPracticesPaidFromTochkaCheckout();
+        setShowChannelAccess(true);
         toast({
           title: "Оплата прошла",
-          description:
-            "Если доступ не откроется автоматически, обновите страницу после минуты или напишите в поддержку с email из чека.",
+          description: "Ниже появится одноразовая ссылка в канал со сборником.",
         });
         notifyPracticesCollectionLandingChannel(null).catch(() => {});
       }
@@ -230,18 +236,23 @@ const PracticesCollectionDebtFreedom = () => {
       <section className="py-16 md:py-20">
         <div className="container-luxe">
           <div className="mb-8 flex flex-wrap items-center gap-4 border border-accent/30 bg-[linear-gradient(115deg,hsl(var(--accent)/0.12),hsl(var(--background))_60%)] px-6 py-5 shadow-[0_16px_42px_-34px_hsl(var(--accent)/0.55)]">
-            <span className="font-display text-3xl text-accent">{practicesPriceLabel}</span>
+            <span className="font-display text-3xl text-accent">{PRACTICES_PRICE_LABEL}</span>
             <div className="min-w-0 flex-1">
               <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
                 Доступ к сборнику
               </span>
               <p className="mt-2 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                Укажите email для чека и перейдите на защищённую страницу банка. После оплаты вернётесь сюда — откроется
-                одноразовая ссылка в Telegram-канал.
+                Оплата на защищённой странице банка ({PRACTICES_PRICE_LABEL}). После успешной оплаты вы вернётесь сюда —
+                откроется одноразовая ссылка в Telegram-канал.
               </p>
             </div>
             {!showChannelAccess && (
-              <PracticesCheckoutForm className="w-full min-w-[min(100%,20rem)] shrink-0 lg:max-w-md" />
+              <a
+                href={tochkaCheckoutUrl}
+                className={`${checkoutButtonClasses} ml-auto shrink-0`}
+              >
+                Оплатить {PRACTICES_PRICE_LABEL}
+              </a>
             )}
           </div>
 
@@ -324,7 +335,9 @@ const PracticesCollectionDebtFreedom = () => {
             </p>
             <div className="mt-8 flex flex-col gap-6">
               {!showChannelAccess && (
-                <PracticesCheckoutForm buttonLabel={`Перейти к оплате ${practicesPriceLabel}`} />
+                <a href={tochkaCheckoutUrl} className={checkoutButtonClassesSecondary}>
+                  Перейти к оплате {PRACTICES_PRICE_LABEL}
+                </a>
               )}
               <div className="flex flex-wrap items-center gap-3">
               <Link

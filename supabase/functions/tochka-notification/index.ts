@@ -3,6 +3,14 @@ import { createServiceSupabase } from "../_shared/createServiceSupabase.ts";
 import { practicesGetReceiptEmail, practicesMarkPaid } from "../_shared/practicesOrdersRepo.ts";
 import { recordPracticesPaidCrm } from "../_shared/practicesPaidCrm.ts";
 import { sendPracticesPurchaseTelegram } from "../_shared/practicesPaidTelegram.ts";
+import {
+  fakeCheckoutEmail,
+  isPracticesCatalogPaymentLink,
+  pickPaymentLinkIdFromWebhook,
+  pickReceiptEmailFromTochkaWebhook,
+  practicesCatalogOrderId,
+  upsertPracticesPaidOrder,
+} from "../_shared/practicesTochkaCatalog.ts";
 import { verifyTochkaWebhookJwt } from "../_shared/tochkaWebhookJwtVerify.ts";
 
 type JsonRecord = Record<string, unknown>;
@@ -176,29 +184,62 @@ Deno.serve(async (req) => {
     ? isAcquiringPaid(parsed)
     : inferMerchantPaymentSuccess(parsed);
 
-  const orderId = pickOrderId(parsed);
+  const paymentLinkId = pickPaymentLinkIdFromWebhook(parsed);
+  let ledgerOrderId = pickOrderId(parsed);
+  if (!ledgerOrderId && paymentLinkId && isPracticesCatalogPaymentLink(paymentLinkId)) {
+    ledgerOrderId = practicesCatalogOrderId(paymentLinkId);
+  }
+
+  const receiptEmailFromWebhook = pickReceiptEmailFromTochkaWebhook(parsed);
 
   console.log("[tochka-notification]", {
     verifiedJwt,
     webhookType: parsed.webhookType,
     status: parsed.status,
-    paymentLinkId: parsed.paymentLinkId,
-    orderId,
+    paymentLinkId: parsed.paymentLinkId ?? paymentLinkId,
+    ledgerOrderId,
+    receiptEmail: receiptEmailFromWebhook ? "(present)" : "(missing)",
     paidGuess,
     rawPreview: raw.slice(0, 120),
   });
 
-  if (orderId && paidGuess) {
+  if (ledgerOrderId && paidGuess) {
     try {
       const sb = createServiceSupabase();
-      const firstPaid = await practicesMarkPaid(sb, orderId);
-      if (firstPaid) {
-        const receiptEmail = await practicesGetReceiptEmail(sb, orderId);
-        await sendPracticesPurchaseTelegram(orderId, receiptEmail);
-        try {
-          await recordPracticesPaidCrm(sb, orderId);
-        } catch (crmE) {
-          console.error("[tochka-notification] CRM record failed", crmE);
+      const isCatalogOrder = ledgerOrderId.startsWith("tochka-catalog-");
+
+      if (isCatalogOrder) {
+        const email = receiptEmailFromWebhook ?? fakeCheckoutEmail(ledgerOrderId);
+        const { created, emailUpdated } = await upsertPracticesPaidOrder(sb, ledgerOrderId, email);
+        if (created || emailUpdated) {
+          await sendPracticesPurchaseTelegram(ledgerOrderId, email);
+          try {
+            await recordPracticesPaidCrm(sb, ledgerOrderId);
+          } catch (crmE) {
+            console.error("[tochka-notification] CRM record failed", crmE);
+          }
+        }
+      } else {
+        const email = receiptEmailFromWebhook ?? fakeCheckoutEmail(ledgerOrderId);
+        const firstPaid = await practicesMarkPaid(sb, ledgerOrderId);
+        if (firstPaid) {
+          const receiptEmail = (await practicesGetReceiptEmail(sb, ledgerOrderId)) ?? email;
+          await sendPracticesPurchaseTelegram(ledgerOrderId, receiptEmail);
+          try {
+            await recordPracticesPaidCrm(sb, ledgerOrderId);
+          } catch (crmE) {
+            console.error("[tochka-notification] CRM record failed", crmE);
+          }
+        } else {
+          const { created, emailUpdated } = await upsertPracticesPaidOrder(sb, ledgerOrderId, email);
+          if (created || emailUpdated) {
+            await sendPracticesPurchaseTelegram(ledgerOrderId, email);
+            try {
+              await recordPracticesPaidCrm(sb, ledgerOrderId);
+            } catch (crmE) {
+              console.error("[tochka-notification] CRM catalog-fallback CRM failed", crmE);
+            }
+          }
         }
       }
     } catch (e) {
