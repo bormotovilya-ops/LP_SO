@@ -56,3 +56,32 @@ export async function practicesGetReceiptEmail(sb: SupabaseClient, orderId: stri
   const s = typeof data.receipt_email === "string" ? data.receipt_email.trim() : "";
   return s ? s : null;
 }
+
+export async function practicesGetChannelInviteLink(
+  sb: SupabaseClient,
+  orderId: string,
+): Promise<string | null> {
+  const { data, error } = await sb
+    .from("practices_payment_orders")
+    .select("channel_invite_link")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (error || !data?.channel_invite_link) return null;
+  const s = typeof data.channel_invite_link === "string" ? data.channel_invite_link.trim() : "";
+  return s ? s : null;
+}
+
+export async function practicesSaveChannelInviteLink(
+  sb: SupabaseClient,
+  orderId: string,
+  inviteLink: string,
+): Promise<void> {
+  const { error } = await sb
+    .from("practices_payment_orders")
+    .update({
+      channel_invite_link: inviteLink,
+      channel_invite_created_at: new Date().toISOString(),
+    })
+    .eq("order_id", orderId);
+  if (error) throw error;
+}

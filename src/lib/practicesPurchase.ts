@@ -10,7 +10,7 @@ export const PRACTICES_PENDING_ORDER_SESSION_KEY = "lp_so_pending_payment_order_
 export type PracticesPaidRecord = {
   /** ISO-время фиксации успешного возврата после проверки оплаты или ?pay=ok */
   paidAt: string;
-  /** OrderId из payment-init — для deep link к боту */
+  /** OrderId из payment-init — для выдачи invite в канал */
   orderId?: string;
 };
 

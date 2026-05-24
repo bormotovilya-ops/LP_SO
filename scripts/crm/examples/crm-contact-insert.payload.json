@@ -1,0 +1,38 @@
+{
+  "stage_code": "new_lead",
+  "stage_history_reason": "lead_created",
+  "stage_history_note": "Ручная вставка из Telegram / квиз",
+  "contact": {
+    "full_name": null,
+    "phone": null,
+    "email": "luninskaya@yandex.ru",
+    "telegram_id": null,
+    "telegram_username": null,
+    "source_channel": "site",
+    "source_detail": "quiz_result_shown_manual",
+    "utm_source": "telegram",
+    "utm_medium": "social",
+    "utm_campaign": "numerology_quiz",
+    "utm_content": "post_may",
+    "utm_term": null,
+    "segment": "money",
+    "consent_personal_data": true,
+    "comment": null
+  },
+  "interactions": [
+    {
+      "channel": "quiz_form",
+      "direction": "inbound",
+      "interaction_type": "quiz_result_shown",
+      "payload": {
+        "quiz_number": 5,
+        "focus": "money",
+        "situation": "start",
+        "communication_channel": "Почта",
+        "account_link": "Luninskaya@yandex.ru",
+        "account_platform": "unknown",
+        "account_handle": null
+      }
+    }
+  ]
+}

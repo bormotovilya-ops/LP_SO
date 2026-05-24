@@ -456,6 +456,12 @@ verify_jwt = true
 import_map = "./functions/practices-paid-check/deno.json"
 entrypoint = "./functions/practices-paid-check/index.ts"
 
+[functions.practices-channel-invite]
+enabled = true
+verify_jwt = false
+import_map = "./functions/practices-channel-invite/deno.json"
+entrypoint = "./functions/practices-channel-invite/index.ts"
+
 [functions.practices-collection-landing]
 enabled = true
 # Публичный вызов с лендинга после ?pay=ok; anon JWT часто недоступен/битый в проде → уведомление в канал не уходило.

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Footer } from "@/components/landing/Footer";
 import { PageEditorToggleButton } from "@/components/PageEditorToggleButton";
 import { ThemeSwitcher } from "@/components/landing/ThemeSwitcher";
-import { buildPracticesCollectionTelegramBotUrl } from "@/lib/botLinks";
+import { PracticesChannelAccess } from "@/components/practices/PracticesChannelAccess";
+import { PracticesCheckoutForm } from "@/components/practices/PracticesCheckoutForm";
 import { functionsApiUrl, supabaseFunctionsInvokeHeaders } from "@/lib/functionsApi";
 import {
   getPracticesPaid,
@@ -15,17 +16,7 @@ import {
 } from "@/lib/practicesPurchase";
 import portraitImage from "../../old/фото-16.jpg";
 
-/** Платёжная страница Точки (каталог). Переопределение: `VITE_TOCHKA_CHECKOUT_URL` в .env / переменные сборки. */
-const DEFAULT_TOCHKA_CHECKOUT_URL =
-  "https://checkout.tochka.com/bc380cff-5068-49b3-a450-73b2e54d7684";
-
 const PRACTICES_PRICE_LABEL = "4 990 ₽";
-
-const checkoutButtonClasses =
-  "inline-flex items-center justify-center border border-accent bg-background/85 px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground";
-
-const checkoutButtonClassesSecondary =
-  "inline-flex items-center justify-center border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground";
 
 const blocks = [
   {
@@ -107,13 +98,6 @@ const PracticesCollectionDebtFreedom = () => {
     typeof window !== "undefined" ? Boolean(getPracticesPaid()) : false,
   );
 
-  const tochkaCheckoutUrl = useMemo(() => {
-    const fromEnv = import.meta.env.VITE_TOCHKA_CHECKOUT_URL?.trim();
-    return fromEnv || DEFAULT_TOCHKA_CHECKOUT_URL;
-  }, []);
-
-  const practicesBotHref = useMemo(() => buildPracticesCollectionTelegramBotUrl(), []);
-
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
@@ -141,7 +125,7 @@ const PracticesCollectionDebtFreedom = () => {
       setSearchParams(next, { replace: true });
       toast({
         title: "Оплата прошла",
-        description: "Откройте бота ниже — доступ к сборнику там откроется.",
+        description: "Ниже появится одноразовая ссылка в канал со сборником.",
       });
       notifyPracticesCollectionLandingChannel(orderId ?? null).catch(() => {});
       return;
@@ -238,30 +222,22 @@ const PracticesCollectionDebtFreedom = () => {
                 Доступ к сборнику
               </span>
               <p className="mt-2 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                Оплата на защищённой странице банка. После успешной оплаты вы вернётесь сюда — доступ откроется автоматически.
+                Укажите email для чека и перейдите на защищённую страницу банка. После оплаты вернётесь сюда — откроется
+                одноразовая ссылка в Telegram-канал.
               </p>
             </div>
-            <a href={tochkaCheckoutUrl} className={`${checkoutButtonClasses} ml-auto shrink-0`}>
-              Оплатить {PRACTICES_PRICE_LABEL}
-            </a>
+            {!practicesPaid && (
+              <PracticesCheckoutForm className="w-full min-w-[min(100%,20rem)] shrink-0 lg:max-w-md" />
+            )}
           </div>
 
           {practicesPaid && (
             <div
+              id="practices-access"
               ref={paidCtaAnchorRef}
-              className="mb-10 flex scroll-mt-24 flex-col items-start gap-4 border border-hairline bg-surface/40 p-6"
+              className="mb-10 scroll-mt-24 border border-hairline bg-surface/40 p-6"
             >
-              <p className="text-sm font-medium leading-relaxed text-accent">
-                Спасибо за оплату. Откройте бота — доступ к сборнику откроется в чате с ботом.
-              </p>
-              <a
-                href={practicesBotHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 border border-foreground/25 bg-background px-5 py-3 text-xs uppercase tracking-[0.22em] text-foreground transition-colors hover:border-accent hover:text-accent"
-              >
-                Открыть бота и получить сборник
-              </a>
+              <PracticesChannelAccess refreshKey={scrollAfterPaySeq} />
             </div>
           )}
 
@@ -332,16 +308,26 @@ const PracticesCollectionDebtFreedom = () => {
               вам фундамент и спокойствие, чтобы вы смогли сделать свой первый шаг из «выживания» в нормальную, свободную
               жизнь ❤️
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <a href={tochkaCheckoutUrl} className={checkoutButtonClassesSecondary}>
-                Перейти к оплате {PRACTICES_PRICE_LABEL}
-              </a>
+            <div className="mt-8 flex flex-col gap-6">
+              {!practicesPaid && (
+                <PracticesCheckoutForm buttonLabel={`Перейти к оплате ${PRACTICES_PRICE_LABEL}`} />
+              )}
+              {practicesPaid && (
+                <a
+                  href="#practices-access"
+                  className="inline-flex w-fit items-center justify-center border border-accent px-5 py-3 text-xs uppercase tracking-[0.22em] text-accent transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  Перейти к ссылке в канал
+                </a>
+              )}
+              <div className="flex flex-wrap items-center gap-3">
               <Link
                 to="/#products"
                 className="inline-flex items-center justify-center border border-hairline px-5 py-3 text-xs uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:border-accent hover:text-accent"
               >
                 Смотреть другие форматы
               </Link>
+              </div>
             </div>
           </div>
         </div>

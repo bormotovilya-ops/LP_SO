@@ -9,8 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_PRACTICES_MATERIALS_URL?: string;
   /** Эквайер для payment-init страницы сборника: `tochka` (по умолчанию) или `tbank` */
   readonly VITE_PAYMENT_PROVIDER?: string;
-  /** Внешняя страница оплаты Точки (каталог / checkout) для страницы сборника */
-  readonly VITE_TOCHKA_CHECKOUT_URL?: string;
+  /** Первое сообщение в канале сборника (подсказка после invite) */
+  readonly VITE_PRACTICES_CHANNEL_POST_URL?: string;
   /** Канонический домен продакшена без завершающего слэша (https://…). Нужен для canonical, sitemap и абсолютных og:image при сборке. */
   readonly VITE_SITE_URL?: string;
 }

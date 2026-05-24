@@ -758,45 +758,23 @@ Deno.serve(async (req) => {
     const chatIdPc = getChatId(update);
     if (!chatIdPc) return json({ ok: true, skipped: true });
 
-    if (practicesStart.mode === "ledger") {
-      const { paid, copyDelivered } = await deliverPracticesCollectionFromChannel(
-        token,
-        chatIdPc,
-        practicesStart.orderId,
-      );
-      if (paid) {
-        await savePracticesCollectionTelegramCrm(update, {
-          orderId: practicesStart.orderId,
-          orderSource: "payment_ledger",
-          copyDelivered,
-        });
-      }
-      return json(
-        {
-          ok: true,
-          flow: "practices_collection",
-          mode: "ledger",
-          orderId: practicesStart.orderId,
-          paid,
-          copyDelivered,
-        },
-        200,
-      );
-    }
-
-    const copyDelivered = await deliverPracticesAfterTochkaPageReturn(token, chatIdPc);
-    await savePracticesCollectionTelegramCrm(update, {
-      orderId: null,
-      orderSource: "tochka_page_return",
-      copyDelivered,
+    const siteUrl = Deno.env.get("PUBLIC_SITE_URL")?.trim().replace(/\/+$/, "") ||
+      "https://svetlana-orlovskaya.ru";
+    const practicesPage = `${siteUrl}/practices/svoboda-ot-dolgov`;
+    await sendTelegram(token, "sendMessage", {
+      chat_id: chatIdPc,
+      text:
+        `Доступ к сборнику «Свобода от долгов» выдаётся на сайте после оплаты — одноразовая ссылка в закрытый канал.\n\nОткройте страницу сборника, оплатите и нажмите «Войти в канал»:\n${practicesPage}`,
+      disable_web_page_preview: false,
+      protect_content: true,
     });
 
     return json(
       {
         ok: true,
         flow: "practices_collection",
-        mode: "direct_tochka",
-        copyDelivered,
+        redirectedToSite: true,
+        mode: practicesStart.mode,
       },
       200,
     );

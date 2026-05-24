@@ -93,6 +93,7 @@ function crmInteractionTypeLabel(type: string): string {
     quiz_completed: "Заявка после квиза (сайт)",
     diagnostic_request_submitted: "Заявка с формы",
     outbound_practices_collection_file: "Выдача сборника практик",
+    practices_collection_channel_invite: "Ссылка в канал сборника (сайт)",
     practices_collection_paid: "Оплата сборника практик",
   };
   return map[type] ?? type.replaceAll("_", " ");
